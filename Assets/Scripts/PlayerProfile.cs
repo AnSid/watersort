@@ -20,11 +20,7 @@ public static class PlayerProfile
             }
             return saved;
         }
-        set
-        {
-            PlayerPrefs.SetString(KEY_NAME, value);
-            PlayerPrefs.Save();
-        }
+        set { PlayerPrefs.SetString(KEY_NAME, value); PlayerPrefs.Save(); }
     }
 
     public static string CountryCode
@@ -40,27 +36,15 @@ public static class PlayerProfile
             }
             return saved;
         }
-        set
-        {
-            PlayerPrefs.SetString(KEY_COUNTRY, value);
-            PlayerPrefs.Save();
-        }
+        set { PlayerPrefs.SetString(KEY_COUNTRY, value); PlayerPrefs.Save(); }
     }
 
     public static bool IsSetupDone
     {
         get => PlayerPrefs.GetInt(KEY_SETUP_DONE, 0) == 1;
-        set
-        {
-            PlayerPrefs.SetInt(KEY_SETUP_DONE, value ? 1 : 0);
-            PlayerPrefs.Save();
-        }
+        set { PlayerPrefs.SetInt(KEY_SETUP_DONE, value ? 1 : 0); PlayerPrefs.Save(); }
     }
 
-    /// <summary>
-    /// Уникальный ID устройства. Генерируется один раз и никогда не меняется.
-    /// Используется для идентификации игрока в рейтинге.
-    /// </summary>
     public static string DeviceId
     {
         get
@@ -76,5 +60,27 @@ public static class PlayerProfile
             }
             return saved;
         }
+    }
+
+    /// <summary>
+    /// Помечает setup как выполненный.
+    /// CountryCode ставит автоматически из региона, только если ещё не сохранён.
+    /// Пользовательская смена страны не перезаписывается.
+    /// </summary>
+    public static void TryAutoSetup()
+    {
+        if (IsSetupDone) return;
+
+        // Если страны ещё нет — ставим из региона
+        string existing = PlayerPrefs.GetString(KEY_COUNTRY, "");
+        if (string.IsNullOrEmpty(existing))
+        {
+            string auto = CountryData.GetDefaultCountryCode();
+            PlayerPrefs.SetString(KEY_COUNTRY, auto);
+            Debug.Log($"[Profile] Страна установлена автоматически: {auto}");
+        }
+
+        PlayerPrefs.SetInt(KEY_SETUP_DONE, 1);
+        PlayerPrefs.Save();
     }
 }

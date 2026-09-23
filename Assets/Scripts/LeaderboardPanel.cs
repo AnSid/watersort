@@ -4,11 +4,12 @@ using System.Collections.Generic;
 using System.Collections;
 
 /// <summary>
-/// Панель рейтинга: топ-50 с офлайн-кэшем.
+/// Панель рейтинга.
+/// Компонент сам создаёт Canvas на своём GameObject.
+/// Close() уничтожает сам контейнер, поэтому повторное открытие работает.
 /// </summary>
 public class LeaderboardPanel : MonoBehaviour
 {
-    private GameObject panelObj;
     private Transform contentRoot;
     private Text statusText;
 
@@ -20,21 +21,17 @@ public class LeaderboardPanel : MonoBehaviour
 
     void BuildUI()
     {
-        panelObj = new GameObject("LeaderboardPanel");
-        panelObj.transform.SetParent(transform, false);
-
-        Canvas canvas = panelObj.AddComponent<Canvas>();
+        Canvas canvas = gameObject.AddComponent<Canvas>();
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
         canvas.sortingOrder = 120;
-        CanvasScaler scaler = panelObj.AddComponent<CanvasScaler>();
+        CanvasScaler scaler = gameObject.AddComponent<CanvasScaler>();
         scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
         scaler.referenceResolution = new Vector2(1080, 1920);
         scaler.matchWidthOrHeight = 0.5f;
-        panelObj.AddComponent<GraphicRaycaster>();
+        gameObject.AddComponent<GraphicRaycaster>();
 
-        // Затемнение
         GameObject bg = new GameObject("BG");
-        bg.transform.SetParent(panelObj.transform, false);
+        bg.transform.SetParent(transform, false);
         Image bgImg = bg.AddComponent<Image>();
         bgImg.color = new Color(0f, 0f, 0f, 0.7f);
         RectTransform bgRt = bg.GetComponent<RectTransform>();
@@ -43,9 +40,8 @@ public class LeaderboardPanel : MonoBehaviour
         bgRt.offsetMin = Vector2.zero;
         bgRt.offsetMax = Vector2.zero;
 
-        // Панель
         GameObject panel = new GameObject("Panel");
-        panel.transform.SetParent(panelObj.transform, false);
+        panel.transform.SetParent(transform, false);
         Image panelImg = panel.AddComponent<Image>();
         panelImg.color = new Color(1f, 1f, 1f, 0.98f);
         if (UIHelper.RoundedButtonSprite != null)
@@ -60,11 +56,9 @@ public class LeaderboardPanel : MonoBehaviour
         pRt.anchoredPosition = Vector2.zero;
         pRt.sizeDelta = new Vector2(900f, 1500f);
 
-        // Заголовок
         MakeCenteredText(panel.transform, "Рейтинг", new Vector2(0, 660), 70, FontStyle.Bold,
             new Color(0.15f, 0.15f, 0.2f), new Vector2(800, 100));
 
-        // Контейнер списка
         GameObject listBg = new GameObject("ListBG");
         listBg.transform.SetParent(panel.transform, false);
         Image listBgImg = listBg.AddComponent<Image>();
@@ -81,7 +75,6 @@ public class LeaderboardPanel : MonoBehaviour
         listBgRt.anchoredPosition = new Vector2(0, 30f);
         listBgRt.sizeDelta = new Vector2(820, 1180);
 
-        // ScrollRect
         GameObject scrollObj = new GameObject("ScrollView");
         scrollObj.transform.SetParent(listBg.transform, false);
         RectTransform scrollRt = scrollObj.AddComponent<RectTransform>();
@@ -131,11 +124,9 @@ public class LeaderboardPanel : MonoBehaviour
         scroll.content = contentRt;
         contentRoot = content.transform;
 
-        // Статус — сверху, между заголовком и списком
         statusText = MakeCenteredText(panel.transform, "", new Vector2(0, 590), 34, FontStyle.Italic,
             new Color(0.5f, 0.5f, 0.55f), new Vector2(800, 60));
 
-        // Кнопки
         CreateButton(panel.transform, "Обновить", new Vector2(-180, -660),
             new Vector2(320, 100), new Color(0.3f, 0.55f, 0.85f), () =>
             {
@@ -148,7 +139,6 @@ public class LeaderboardPanel : MonoBehaviour
 
     IEnumerator LoadScores()
     {
-        // 1. Сразу показать кэш
         List<LeaderboardRecord> cached = LeaderboardCache.Load();
         if (cached != null && cached.Count > 0)
         {
@@ -161,7 +151,6 @@ public class LeaderboardPanel : MonoBehaviour
             if (statusText != null) statusText.text = "Загрузка…";
         }
 
-        // 2. Запрос к серверу
         List<LeaderboardRecord> fresh = null;
         yield return LeaderboardAPI.GetTopScores(50, result => { fresh = result; });
 
@@ -173,10 +162,8 @@ public class LeaderboardPanel : MonoBehaviour
         }
         else
         {
-            // Сервер не ответил
             if (cached != null && cached.Count > 0)
             {
-                // Уже показан кэш — просто сообщаем
                 if (statusText != null) statusText.text = "Нет соединения. Показан кэш";
             }
             else
@@ -198,9 +185,7 @@ public class LeaderboardPanel : MonoBehaviour
         ClearList();
         if (records == null) return;
         for (int i = 0; i < records.Count; i++)
-        {
             CreateRow(i + 1, records[i]);
-        }
     }
 
     void CreateRow(int place, LeaderboardRecord rec)
@@ -220,17 +205,21 @@ public class LeaderboardPanel : MonoBehaviour
         le.minHeight = 90;
         le.preferredHeight = 90;
 
-        MakeRowText(row.transform, place.ToString(), new Vector2(30, 0), 40, FontStyle.Bold,
-            new Color(0.2f, 0.2f, 0.3f), new Vector2(80, 90));
+        // Место
+        MakeRowText(row.transform, place.ToString(), new Vector2(20, 0), 38, FontStyle.Bold,
+            new Color(0.2f, 0.2f, 0.3f), new Vector2(60, 90));
 
-        string flag = CountryData.GetFlag(rec.country_code);
-        MakeRowText(row.transform, flag, new Vector2(120, 0), 44, FontStyle.Normal,
-            Color.black, new Vector2(80, 90));
+        // Код страны
+        string code = string.IsNullOrEmpty(rec.country_code) ? "—" : rec.country_code.ToUpper();
+        MakeRowText(row.transform, code, new Vector2(100, 0), 38, FontStyle.Bold,
+            new Color(0.3f, 0.55f, 0.85f), new Vector2(70, 90));
 
-        MakeRowText(row.transform, rec.player_name ?? "—", new Vector2(310, 0), 40, FontStyle.Normal,
-            new Color(0.15f, 0.15f, 0.2f), new Vector2(380, 90));
+        // Имя
+        MakeRowText(row.transform, rec.player_name ?? "—", new Vector2(200, 0), 38, FontStyle.Normal,
+            new Color(0.15f, 0.15f, 0.2f), new Vector2(440, 90));
 
-        MakeRowTextRight(row.transform, rec.score.ToString(), new Vector2(-30, 0), 40, FontStyle.Bold,
+        // Очки — правый край
+        MakeRowTextRight(row.transform, rec.score.ToString(), new Vector2(-20, 0), 38, FontStyle.Bold,
             new Color(0.3f, 0.55f, 0.85f), new Vector2(160, 90));
     }
 
@@ -343,7 +332,6 @@ public class LeaderboardPanel : MonoBehaviour
 
     void Close()
     {
-        if (panelObj != null) Destroy(panelObj);
-        panelObj = null;
+        Destroy(gameObject);
     }
 }

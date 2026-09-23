@@ -461,19 +461,11 @@ public class SVGConverter : MonoBehaviour
 
     // ==================== SVG-ПАРСЕР И РАСТЕРИЗАТОР ====================
 
-    /// <summary>
-    /// Узел пути: список точек после парсинга. Храним сегменты как полилинию
-    /// (кривые Безье аппроксимируем отрезками).
-    /// </summary>
     class SvgPath
     {
         public List<Vector2[]> Subpaths = new List<Vector2[]>();
     }
 
-    /// <summary>
-    /// Парсит d-атрибут SVG (поддержка M, L, C, Z, H, V).
-    /// Возвращает список подпутей (полилиний).
-    /// </summary>
     SvgPath ParseSvgPath(string d)
     {
         SvgPath path = new SvgPath();
@@ -492,8 +484,6 @@ public class SVGConverter : MonoBehaviour
 
             if (char.IsLetter(c))
             {
-                // Выполнить предыдущую команду с накопленными числами
-                // (для M/L/C может быть несколько групп подряд)
                 FlushCommand(path, ref current, ref cur, ref start, cmd, nums);
                 nums.Clear();
                 cmd = c;
@@ -513,7 +503,6 @@ public class SVGConverter : MonoBehaviour
                 i++;
                 while (i < d.Length && (char.IsDigit(d[i]) || d[i] == '.' || d[i] == '-' || d[i] == '+' || d[i] == 'e' || d[i] == 'E'))
                 {
-                    // Разрешаем '-' и '+' только в начале числа
                     if ((d[i] == '-' || d[i] == '+') && i > startIdx) break;
                     if (d[i] == 'e' || d[i] == 'E')
                     {
@@ -535,7 +524,6 @@ public class SVGConverter : MonoBehaviour
 
         FlushCommand(path, ref current, ref cur, ref start, cmd, nums);
 
-        // Закрыть незакрытые подпути
         if (current.Count > 0)
         {
             path.Subpaths.Add(current.ToArray());
@@ -561,12 +549,10 @@ public class SVGConverter : MonoBehaviour
                     {
                         float x = nums[idx], y = nums[idx + 1];
                         if (relative && !first && current.Count > 0) { x += cur.x; y += cur.y; }
-                        else if (relative && current.Count == 0) { /* first M в relative = абсолютный? По спеке — да, но обычно M не relative */ }
                         Vector2 p = new Vector2(x, y);
 
                         if (first)
                         {
-                            // Сохранить предыдущий подпуть
                             if (current.Count > 0)
                             {
                                 path.Subpaths.Add(current.ToArray());
@@ -688,11 +674,6 @@ public class SVGConverter : MonoBehaviour
         return p;
     }
 
-    /// <summary>
-    /// Растеризует путь: для каждого пикселя считает even-odd fill через
-    /// горизонтальный луч вправо и подсчитывает пересечения со всеми сегментами.
-    /// Возвращает alpha [0..1] с антиалиасингом через субсэмплинг 2x2.
-    /// </summary>
     Texture2D RasterizeSvgPath(SvgPath path, int size, float viewBoxMin, float viewBoxSize)
     {
         Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
@@ -702,7 +683,6 @@ public class SVGConverter : MonoBehaviour
 
         float scale = size / viewBoxSize;
 
-        // Собираем все сегменты (отрезки) в один список
         List<Vector2[]> segs = new List<Vector2[]>();
         foreach (var sub in path.Subpaths)
         {
@@ -712,7 +692,7 @@ public class SVGConverter : MonoBehaviour
             }
         }
 
-        int SS = 2; // субсэмплинг 2x2
+        int SS = 2;
         for (int y = 0; y < size; y++)
         {
             for (int x = 0; x < size; x++)
@@ -722,7 +702,6 @@ public class SVGConverter : MonoBehaviour
                 {
                     for (int sx = 0; sx < SS; sx++)
                     {
-                        // координаты в SVG-пространстве: инвертируем Y
                         float px = (x + (sx + 0.5f) / SS) / scale + viewBoxMin;
                         float py = (size - 1 - (y + (sy + 0.5f) / SS)) / scale + viewBoxMin;
 
@@ -731,7 +710,6 @@ public class SVGConverter : MonoBehaviour
                         {
                             Vector2 a = s[0];
                             Vector2 b = s[1];
-                            // луч вправо: py должен лежать между a.y и b.y
                             if ((a.y > py) != (b.y > py))
                             {
                                 float t = (py - a.y) / (b.y - a.y);
@@ -756,10 +734,6 @@ public class SVGConverter : MonoBehaviour
     }
 
     // ==================== ИКОНКИ ТУЛБАРА (Material Symbols) ====================
-
-    // Данные — официальные path-ы Material Symbols (Apache 2.0).
-    // viewBox: 0 -960 960 960, Y вверх, начало координат в центре.
-    // Мы нормализуем: сдвигаем на +960 по Y, масштабируем 960 -> 128.
 
     const string SVG_SETTINGS =
         "M370-80l-16-128q-13-5-24.5-12T307-235l-119 50L78-375l103-78q-1-7-1-13.5v-27q0-6.5 1-13.5L78-585l110-190 119 50q11-8 23-15t24-12l16-128h220l16 128q13 5 24.5 12t22.5 15l119-50 110 190-103 78q1 7 1 13.5v27q0 6.5-1 13.5l103 78-110 190-119-50q-11 8-23 15t-24 12L590-80H370Zm112-260q58 0 99-41t41-99q0-58-41-99t-99-41q-59 0-99.5 41T342-480q0 58 40.5 99t99.5 41Z";
@@ -790,9 +764,6 @@ public class SVGConverter : MonoBehaviour
     {
         SvgPath path = ParseSvgPath(svgPathData);
 
-        // viewBox 0 -960 960 960: X от -480 до +480, Y от -960 до 0.
-        // Сдвиг: X += 480 (станет 0..960), Y += 960 (станет 0..960).
-        // Применим сдвиг прямо к точкам.
         foreach (var sub in path.Subpaths)
         {
             for (int i = 0; i < sub.Length; i++)

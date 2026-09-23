@@ -4,10 +4,11 @@ using System;
 
 /// <summary>
 /// Панель профиля: имя, страна, награды.
+/// Компонент сам создаёт Canvas на своём GameObject.
+/// Close() уничтожает сам контейнер, поэтому повторное открытие работает.
 /// </summary>
 public class ProfilePanel : MonoBehaviour
 {
-    private GameObject panelObj;
     private InputField nameInput;
 
     public void Show()
@@ -17,21 +18,18 @@ public class ProfilePanel : MonoBehaviour
 
     void BuildUI()
     {
-        panelObj = new GameObject("ProfilePanel");
-        panelObj.transform.SetParent(transform, false);
-
-        Canvas canvas = panelObj.AddComponent<Canvas>();
+        Canvas canvas = gameObject.AddComponent<Canvas>();
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
         canvas.sortingOrder = 115;
-        CanvasScaler scaler = panelObj.AddComponent<CanvasScaler>();
+        CanvasScaler scaler = gameObject.AddComponent<CanvasScaler>();
         scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
         scaler.referenceResolution = new Vector2(1080, 1920);
         scaler.matchWidthOrHeight = 0.5f;
-        panelObj.AddComponent<GraphicRaycaster>();
+        gameObject.AddComponent<GraphicRaycaster>();
 
         // Затемнение
         GameObject bg = new GameObject("BG");
-        bg.transform.SetParent(panelObj.transform, false);
+        bg.transform.SetParent(transform, false);
         Image bgImg = bg.AddComponent<Image>();
         bgImg.color = new Color(0f, 0f, 0f, 0.7f);
         RectTransform bgRt = bg.GetComponent<RectTransform>();
@@ -42,7 +40,7 @@ public class ProfilePanel : MonoBehaviour
 
         // Панель
         GameObject panel = new GameObject("Panel");
-        panel.transform.SetParent(panelObj.transform, false);
+        panel.transform.SetParent(transform, false);
         Image panelImg = panel.AddComponent<Image>();
         panelImg.color = new Color(1f, 1f, 1f, 0.98f);
         if (UIHelper.RoundedButtonSprite != null)
@@ -233,7 +231,6 @@ public class ProfilePanel : MonoBehaviour
 
     void Close()
     {
-        if (panelObj != null) Destroy(panelObj);
-        panelObj = null;
+        Destroy(gameObject);
     }
 }

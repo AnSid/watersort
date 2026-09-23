@@ -24,6 +24,10 @@ public class WaterSort : MonoBehaviour
     private bool gameWon = false;
     private bool isAnimating = false;
 
+    // Клик во время анимации: скипаем анимацию и обрабатываем клик,
+    // когда isAnimating снова станет false.
+    private bool pendingClick = false;
+
     private Color[] colors;
 
     // Стек ходов для Undo
@@ -52,6 +56,8 @@ public class WaterSort : MonoBehaviour
     void Start()
     {
         UIHelper.RoundedButtonSprite = roundedButtonSprite;
+
+        PlayerProfile.TryAutoSetup();
 
         SetupLighting();
         SetupCamera();
@@ -238,19 +244,9 @@ public class WaterSort : MonoBehaviour
         GameObject panelObj = new GameObject("CountrySelectPanel");
         panelObj.transform.SetParent(transform, false);
         countryPanel = panelObj.AddComponent<CountrySelectPanel>();
-
-        if (!PlayerProfile.IsSetupDone)
-        {
-            countryPanel.Show(() =>
-            {
-                toolbar.SetHint("Страна: " + CountryData.GetName(PlayerProfile.CountryCode));
-            });
-        }
+        // Панель при старте не показываем — страна ставится автоматически в TryAutoSetup().
+        // Пользователь может открыть её вручную через Настройки → Профиль → Страна.
     }
-
-    // ============================================================
-    // Панели
-    // ============================================================
 
     void OpenSettings()
     {
@@ -321,6 +317,7 @@ public class WaterSort : MonoBehaviour
     {
         StopAllCoroutines();
         isAnimating = false;
+        pendingClick = false;
         PourAnimator.ResetSkip();
 
         foreach (GameObject obj in spawnedObjects)
@@ -338,17 +335,14 @@ public class WaterSort : MonoBehaviour
         if (winText != null) winText.gameObject.SetActive(false);
         if (winPanel != null) winPanel.gameObject.SetActive(false);
         if (nextButtonObj != null) nextButtonObj.SetActive(false);
+
+        int cc, tc, ss;
+        LevelGenerator.GetLevelParams(currentLevel, out cc, out tc, out ss);
+
+        tubes = LevelGenerator.Generate(cc, tc, 0);
+
         if (toolbar != null) toolbar.SetHint("Выбери колбочку");
-
-        GenerateLevel();
         CreateTubeVisuals();
-    }
-
-    void GenerateLevel()
-    {
-        int colorCount, tubeCount, shuffleSteps;
-        LevelGenerator.GetLevelParams(currentLevel, out colorCount, out tubeCount, out shuffleSteps);
-        tubes = LevelGenerator.Generate(colorCount, tubeCount, shuffleSteps);
     }
 
     void CalculateTubePositions()
@@ -409,14 +403,28 @@ public class WaterSort : MonoBehaviour
             if (isAnimating)
             {
                 PourAnimator.RequestSkip();
-                return;
+                pendingClick = true;
             }
-
-            Vector3 mousePos = cam.ScreenToWorldPoint(Input.mousePosition);
-            mousePos.z = 0f;
-            int clickedTube = GetTubeAtPosition(mousePos);
-            if (clickedTube >= 0) OnTubeClicked(clickedTube);
+            else
+            {
+                ProcessClick();
+            }
+            return;
         }
+
+        if (pendingClick && !isAnimating)
+        {
+            pendingClick = false;
+            ProcessClick();
+        }
+    }
+
+    void ProcessClick()
+    {
+        Vector3 mousePos = cam.ScreenToWorldPoint(Input.mousePosition);
+        mousePos.z = 0f;
+        int clickedTube = GetTubeAtPosition(mousePos);
+        if (clickedTube >= 0) OnTubeClicked(clickedTube);
     }
 
     int GetTubeAtPosition(Vector3 worldPos)
@@ -553,7 +561,6 @@ public class WaterSort : MonoBehaviour
             }
         }
 
-        // Записываем ход в историю
         moveHistory.Push(new MoveRecord { from = from, to = to, count = pourCount });
 
         selectedTube = -1;
@@ -600,7 +607,6 @@ public class WaterSort : MonoBehaviour
 
         MoveRecord move = moveHistory.Pop();
 
-        // Откат: возвращаем count слоёв из move.to в move.from
         for (int i = 0; i < move.count; i++)
         {
             if (tubes[move.to].Count == 0) break;
@@ -623,20 +629,16 @@ public class WaterSort : MonoBehaviour
         if (gameWon) return;
         if (isAnimating) return;
 
-        // Ищем все валидные ходы
         List<(int from, int to)> valid = new List<(int, int)>();
         for (int from = 0; from < TUBE_COUNT; from++)
         {
             if (tubes[from].Count == 0) continue;
-            // Пропускаем уже решённые колбы
             if (IsTubeSolved(from)) continue;
 
             for (int to = 0; to < TUBE_COUNT; to++)
             {
                 if (to == from) continue;
                 if (!CanPour(from, to)) continue;
-
-                // Фильтр бесполезных ходов
                 if (IsUselessMove(from, to)) continue;
 
                 valid.Add((from, to));
@@ -665,7 +667,6 @@ public class WaterSort : MonoBehaviour
 
     bool IsUselessMove(int from, int to)
     {
-        // Если to пустая, и весь from — одного цвета, это бессмысленно.
         if (tubes[to].Count == 0)
         {
             bool allSame = true;
@@ -727,6 +728,13 @@ public class WaterSort : MonoBehaviour
 
         if (winPanel != null) winPanel.gameObject.SetActive(true);
         winText.gameObject.SetActive(true);
+
+        // ---- Конфетти-салют ----
+        if (layerSprite != null && cam != null)
+        {
+            Vector3 origin = new Vector3(0f, cam.transform.position.y + 1.0f, 0f);
+            ConfettiEffect.Play(origin, layerSprite, this);
+        }
 
         RectTransform txtRt = winText.rectTransform;
         RectTransform panelRt = winPanel.rectTransform;

@@ -1,69 +1,56 @@
 using System.Collections.Generic;
-using UnityEngine;
+using System;
 
 /// <summary>
 /// Генератор уровней Water Sort.
-/// Гарантия решаемости: BFS-проверка каждого сгенерированного поля.
-/// Уровень принимается, только если BFS нашёл решение длиной от MIN_SOLUTION до MAX_SOLUTION.
+/// Маленькие уровни (≤4 цветов) — без BFS, случайная раздача.
+/// Большие — BFS с малыми лимитами (не фризит).
+/// Потокобезопасен: не использует UnityEngine API.
 /// </summary>
 public static class LevelGenerator
 {
     public const int LAYERS_PER_TUBE = 4;
 
-    // Ограничения BFS
-    private const int MAX_VISITED_STATES = 80000;
-    private const int MAX_BFS_DEPTH = 80;
-
-    // Ограничения «интересности» и сложности
-    private const int MIN_SOLUTION_LENGTH = 10;
-    private const int GENERATION_ATTEMPTS = 50;
-
     public static List<List<int>> Generate(int colorCount, int tubeCount, int shuffleSteps)
     {
-        System.Random rng = new System.Random();
+        // Маленькие уровни — без BFS
+        if (colorCount <= 4)
+            return BuildRandom(colorCount, tubeCount, new Random());
 
-        for (int attempt = 0; attempt < GENERATION_ATTEMPTS; attempt++)
+        // Лимиты BFS в зависимости от размера
+        int maxVisited = colorCount <= 6 ? 3000 : 8000;
+        int minSolution = colorCount <= 6 ? 5 : 8;
+        int attempts = colorCount <= 6 ? 3 : 5;
+
+        for (int attempt = 0; attempt < attempts; attempt++)
         {
-            // 1. Случайная раздача
-            var candidate = BuildRandom(colorCount, tubeCount, rng);
-
-            // 2. Проверка «интересности» — без решённых колб, ≥50% перемешаны
+            var candidate = BuildRandom(colorCount, tubeCount, new Random());
             if (!IsInterestingStart(candidate)) continue;
 
-            // 3. BFS-проверка решаемости и длины решения
-            int solutionLength = BFSSolutionLength(candidate, colorCount);
-            if (solutionLength < 0) continue;                        // не решается
-            if (solutionLength < MIN_SOLUTION_LENGTH) continue;      // слишком просто
-            if (solutionLength > MAX_BFS_DEPTH) continue;            // BFS не дошёл
+            int len = BFSSolutionLength(candidate, colorCount, maxVisited);
+            if (len < 0) continue;
+            if (len < minSolution) continue;
 
-            Debug.Log($"[LevelGenerator] Уровень сгенерирован: {colorCount} цветов, {tubeCount} колб, решение за {solutionLength} ходов.");
             return candidate;
         }
 
-        // Если все попытки провалились — возвращаем последнюю (редкий случай)
-        Debug.LogWarning("[LevelGenerator] Не удалось найти интересный уровень за 50 попыток, возвращаю последний.");
-        return BuildRandom(colorCount, tubeCount, rng);
+        // Fallback — случайная раздача без проверки
+        return BuildRandom(colorCount, tubeCount, new Random());
     }
 
-    // ============================================================
-    // Случайная раздача слоёв
-    // ============================================================
-    private static List<List<int>> BuildRandom(int colorCount, int tubeCount, System.Random rng)
+    private static List<List<int>> BuildRandom(int colorCount, int tubeCount, Random rng)
     {
-        // Мешок: каждого цвета по 4
         List<int> bag = new List<int>();
         for (int c = 0; c < colorCount; c++)
             for (int i = 0; i < LAYERS_PER_TUBE; i++)
                 bag.Add(c);
 
-        // Перемешать мешок
         for (int i = 0; i < bag.Count; i++)
         {
             int r = rng.Next(i, bag.Count);
-            (bag[i], bag[r]) = (bag[r], bag[i]);
+            int tmp = bag[i]; bag[i] = bag[r]; bag[r] = tmp;
         }
 
-        // Разложить по colorCount колбам (по 4 слоя), остальные — пустые
         List<List<int>> tubes = new List<List<int>>();
         int idx = 0;
         for (int i = 0; i < colorCount; i++)
@@ -79,9 +66,6 @@ public static class LevelGenerator
         return tubes;
     }
 
-    // ============================================================
-    // Проверка «интересности»
-    // ============================================================
     private static bool IsTubeSolved(List<int> t)
     {
         if (t.Count != LAYERS_PER_TUBE) return false;
@@ -108,38 +92,34 @@ public static class LevelGenerator
             }
         }
         if (nonEmpty == 0) return false;
-        return mixed >= Mathf.CeilToInt(nonEmpty * 0.5f);
+        return mixed >= (int)Math.Ceiling(nonEmpty * 0.5);
     }
 
-    // ============================================================
-    // BFS — поиск кратчайшего решения
-    // ============================================================
-    private static int BFSSolutionLength(List<List<int>> start, int colorCount)
+    private static int BFSSolutionLength(List<List<int>> start, int colorCount, int maxVisited)
     {
-        // Состояние — массив колб, сериализуем в строку (для HashSet)
         string startKey = Serialize(start);
         if (IsWin(start, colorCount)) return 0;
 
         var visited = new HashSet<string>();
         visited.Add(startKey);
 
-        var queue = new Queue<(List<List<int>> state, int depth)>();
-        queue.Enqueue((Clone(start), 0));
+        var queue = new Queue<Tuple<List<List<int>>, int>>();
+        queue.Enqueue(Tuple.Create(Clone(start), 0));
 
         int tubeCount = start.Count;
 
         while (queue.Count > 0)
         {
-            var (state, depth) = queue.Dequeue();
-            if (depth >= MAX_BFS_DEPTH) continue;
+            var item = queue.Dequeue();
+            var state = item.Item1;
+            int depth = item.Item2;
+            if (depth >= 80) continue;
 
-            // Перебираем все возможные ходы
             for (int from = 0; from < tubeCount; from++)
             {
                 if (state[from].Count == 0) continue;
 
                 int topColor = state[from][state[from].Count - 1];
-                // Количество слоёв этого цвета сверху
                 int sameCount = 0;
                 for (int i = state[from].Count - 1; i >= 0; i--)
                 {
@@ -152,12 +132,10 @@ public static class LevelGenerator
                     if (to == from) continue;
                     if (state[to].Count >= LAYERS_PER_TUBE) continue;
                     if (state[to].Count > 0 && state[to][state[to].Count - 1] != topColor) continue;
-
-                    // Не переливать из «готовой» колбы в пустую — бессмысленно
                     if (state[to].Count == 0 && IsTubeSolved(state[from])) continue;
 
                     int freeSpace = LAYERS_PER_TUBE - state[to].Count;
-                    int moveCount = Mathf.Min(sameCount, freeSpace);
+                    int moveCount = Math.Min(sameCount, freeSpace);
                     if (moveCount <= 0) continue;
 
                     var next = Clone(state);
@@ -167,16 +145,15 @@ public static class LevelGenerator
                         next[to].Add(topColor);
                     }
 
-                    // Проверка на победу
                     if (IsWin(next, colorCount)) return depth + 1;
 
                     string key = Serialize(next);
                     if (visited.Contains(key)) continue;
                     visited.Add(key);
 
-                    if (visited.Count > MAX_VISITED_STATES) return -1; // защита от OOM
+                    if (visited.Count > maxVisited) return -1;
 
-                    queue.Enqueue((next, depth + 1));
+                    queue.Enqueue(Tuple.Create(next, depth + 1));
                 }
             }
         }
@@ -200,7 +177,6 @@ public static class LevelGenerator
 
     private static string Serialize(List<List<int>> tubes)
     {
-        // Простая сериализация: "0,1,2|3,3,1|..."
         var sb = new System.Text.StringBuilder();
         for (int i = 0; i < tubes.Count; i++)
         {
@@ -221,12 +197,8 @@ public static class LevelGenerator
         return c;
     }
 
-    // ============================================================
-    // Формула сложности
-    // ============================================================
     public static void GetLevelParams(int level, out int colorCount, out int tubeCount, out int shuffleSteps)
     {
-        // Цвета
         if (level <= 1) colorCount = 3;
         else if (level == 2) colorCount = 4;
         else if (level == 3) colorCount = 5;
@@ -240,12 +212,8 @@ public static class LevelGenerator
         else if (level <= 16) colorCount = 11;
         else colorCount = 12;
 
-        // Пустые колбы: 2 до 8 уровня, 1 с 9+
         int emptyTubes = (level < 9) ? 2 : 1;
         tubeCount = colorCount + emptyTubes;
-
-        // shuffleSteps больше не используется в старой логике,
-        // но BFS всё равно ограничен MAX_BFS_DEPTH = 80
         shuffleSteps = 0;
     }
 }

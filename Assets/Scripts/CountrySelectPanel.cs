@@ -2,9 +2,13 @@ using UnityEngine;
 using UnityEngine.UI;
 using System.Collections.Generic;
 
+/// <summary>
+/// Панель выбора страны.
+/// Компонент сам создаёт Canvas на своём GameObject.
+/// Close() уничтожает сам контейнер, поэтому повторное открытие работает.
+/// </summary>
 public class CountrySelectPanel : MonoBehaviour
 {
-    private GameObject panelObj;
     private Transform contentRoot;
     private System.Action onSelected;
 
@@ -16,21 +20,18 @@ public class CountrySelectPanel : MonoBehaviour
 
     void BuildUI()
     {
-        panelObj = new GameObject("CountrySelectPanel");
-        panelObj.transform.SetParent(transform, false);
-
-        Canvas canvas = panelObj.AddComponent<Canvas>();
+        Canvas canvas = gameObject.AddComponent<Canvas>();
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
         canvas.sortingOrder = 100;
-        CanvasScaler scaler = panelObj.AddComponent<CanvasScaler>();
+        CanvasScaler scaler = gameObject.AddComponent<CanvasScaler>();
         scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
         scaler.referenceResolution = new Vector2(1080, 1920);
         scaler.matchWidthOrHeight = 0.5f;
-        panelObj.AddComponent<GraphicRaycaster>();
+        gameObject.AddComponent<GraphicRaycaster>();
 
         // Затемнённый фон
         GameObject bg = new GameObject("BG");
-        bg.transform.SetParent(panelObj.transform, false);
+        bg.transform.SetParent(transform, false);
         Image bgImg = bg.AddComponent<Image>();
         bgImg.color = new Color(0f, 0f, 0f, 0.7f);
         RectTransform bgRt = bg.GetComponent<RectTransform>();
@@ -39,9 +40,9 @@ public class CountrySelectPanel : MonoBehaviour
         bgRt.offsetMin = Vector2.zero;
         bgRt.offsetMax = Vector2.zero;
 
-        // Заголовок (сдвинут ниже, чтобы не уезжал за верх)
+        // Заголовок
         GameObject titleObj = new GameObject("Title");
-        titleObj.transform.SetParent(panelObj.transform, false);
+        titleObj.transform.SetParent(transform, false);
         Text title = titleObj.AddComponent<Text>();
         title.text = "Выберите страну";
         title.font = UIHelper.Font;
@@ -56,9 +57,9 @@ public class CountrySelectPanel : MonoBehaviour
         titleRt.anchoredPosition = new Vector2(0, -120);
         titleRt.sizeDelta = new Vector2(900, 100);
 
-        // Фон списка — уменьшен по высоте, сдвинут вверх, чтобы «Отмена» не налезала
+        // Фон списка
         GameObject listBg = new GameObject("ListBG");
-        listBg.transform.SetParent(panelObj.transform, false);
+        listBg.transform.SetParent(transform, false);
         Image listBgImg = listBg.AddComponent<Image>();
         listBgImg.color = new Color(1f, 1f, 1f, 0.95f);
         if (UIHelper.RoundedButtonSprite != null)
@@ -131,11 +132,8 @@ public class CountrySelectPanel : MonoBehaviour
             CreateCountryButton(country.code, country.name);
         }
 
-        // Отмена — прижата к низу с отступом
-        if (PlayerProfile.IsSetupDone)
-        {
-            CreateCancelButton();
-        }
+        // Кнопка «Отмена» — всегда
+        CreateCancelButton();
     }
 
     void CreateCountryButton(string code, string name)
@@ -182,7 +180,7 @@ public class CountrySelectPanel : MonoBehaviour
     void CreateCancelButton()
     {
         GameObject btnObj = new GameObject("CancelButton");
-        btnObj.transform.SetParent(panelObj.transform, false);
+        btnObj.transform.SetParent(transform, false);
 
         Image img = btnObj.AddComponent<Image>();
         img.color = new Color(0.6f, 0.6f, 0.65f);
@@ -229,8 +227,6 @@ public class CountrySelectPanel : MonoBehaviour
 
     void Close()
     {
-        if (panelObj != null)
-            Destroy(panelObj);
-        panelObj = null;
+        Destroy(gameObject);
     }
 }

@@ -35,14 +35,12 @@ public class Toolbar : MonoBehaviour
         topRt.anchoredPosition = Vector2.zero;
         topRt.sizeDelta = new Vector2(0f, BAR_HEIGHT);
 
-        MakeText(topBar.transform, "Title", "Water Sort",
-            TextAnchor.MiddleLeft, new Vector2(30, 0), 55, Color.white,
-            new Vector2(400, BAR_HEIGHT)).fontStyle = FontStyle.Bold;
-
+        // Уровень — по центру
         levelText = MakeText(topBar.transform, "LevelText", "Уровень 1",
-            TextAnchor.MiddleLeft, new Vector2(440, 0), 45, Color.white,
-            new Vector2(320, BAR_HEIGHT));
+            TextAnchor.MiddleCenter, Vector2.zero, 55, Color.white,
+            new Vector2(400, BAR_HEIGHT));
 
+        // Кнопки — справа
         GameObject btnRoot = new GameObject("Buttons");
         btnRoot.transform.SetParent(topBar.transform, false);
         RectTransform btnRt = btnRoot.AddComponent<RectTransform>();
@@ -79,7 +77,6 @@ public class Toolbar : MonoBehaviour
         RectTransform rt = btnObj.AddComponent<RectTransform>();
         rt.sizeDelta = new Vector2(BTN_SIZE, BTN_SIZE);
 
-        // Фон кнопки — прозрачный, для клика
         Image hit = btnObj.AddComponent<Image>();
         hit.color = new Color(1f, 1f, 1f, 0.001f);
         hit.raycastTarget = true;
@@ -88,7 +85,6 @@ public class Toolbar : MonoBehaviour
         btn.targetGraphic = hit;
         btn.onClick.AddListener(() => onClick?.Invoke());
 
-        // Иконка — дочерний Image со спрайтом
         GameObject iconObj = new GameObject("Icon");
         iconObj.transform.SetParent(btnObj.transform, false);
 
@@ -151,5 +147,11 @@ public class Toolbar : MonoBehaviour
     public void SetHint(string text)
     {
         if (hintText != null) hintText.text = text;
+    }
+
+    public void SetLoading(bool isLoading)
+    {
+        if (hintText != null)
+            hintText.text = isLoading ? "Загрузка…" : "Выбери колбочку";
     }
 }

@@ -4,7 +4,6 @@ using System.Linq;
 
 public static class CountryData
 {
-    // Список стран: код ISO + название на русском
     public static readonly List<(string code, string name)> Countries = new List<(string, string)>
     {
         ("RU", "Россия"),
@@ -74,7 +73,9 @@ public static class CountryData
         ("MN", "Монголия"),
     };
 
-    // Получить эмодзи-флаг по двухбуквенному коду
+    /// <summary>
+    /// Эмодзи-флаг по ISO-коду (любому 2-буквенному).
+    /// </summary>
     public static string GetFlag(string code)
     {
         if (string.IsNullOrEmpty(code) || code.Length != 2) return "🏳";
@@ -82,35 +83,49 @@ public static class CountryData
         return string.Concat(code.Select(c => char.ConvertFromUtf32(c + 0x1F1A5)));
     }
 
-    // Получить название страны по коду
+    /// <summary>
+    /// Название страны. Если кода нет в списке — "Неизвестная страна (CH)".
+    /// </summary>
     public static string GetName(string code)
     {
         if (string.IsNullOrEmpty(code)) return "Неизвестно";
         var found = Countries.FirstOrDefault(c => c.code == code.ToUpper());
-        return string.IsNullOrEmpty(found.name) ? code : found.name;
+        if (!string.IsNullOrEmpty(found.name)) return found.name;
+        return $"Неизвестная страна ({code.ToUpper()})";
     }
 
-    // Определить страну по умолчанию (офлайн, из региона устройства)
+    /// <summary>
+    /// Страна по умолчанию из региона устройства.
+    /// Возвращает реальный ISO-код региона (даже если его нет в списке).
+    /// Если регион не определился — "RU".
+    /// </summary>
     public static string GetDefaultCountryCode()
     {
         try
         {
             string region = RegionInfo.CurrentRegion.TwoLetterISORegionName;
             if (!string.IsNullOrEmpty(region) && region.Length == 2)
-            {
-                string upper = region.ToUpper();
-                // Проверяем, что такой код есть в нашем списке
-                if (Countries.Any(c => c.code == upper))
-                    return upper;
-            }
+                return region.ToUpper();
         }
         catch { }
         return "RU";
     }
 
-    // Получить название страны с флагом (для отображения в UI)
+    /// <summary>
+    /// Флаг + название. Для стран вне списка — "🇨🇭 Неизвестная страна (CH)".
+    /// </summary>
     public static string GetFlagWithName(string code)
     {
         return $"{GetFlag(code)}  {GetName(code)}";
+    }
+
+    /// <summary>
+    /// Проверяет, что код есть в списке стран.
+    /// </summary>
+    public static bool IsKnownCode(string code)
+    {
+        if (string.IsNullOrEmpty(code) || code.Length != 2) return false;
+        code = code.ToUpper();
+        return Countries.Any(c => c.code == code);
     }
 }
