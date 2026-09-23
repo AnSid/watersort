@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+<body>
+<img id="svgImage" src="./tube.svg" style="display:none;">
+<script>
+window.onload = function() {
+    const img = document.getElementById('svgImage');
+    const canvas = document.createElement('canvas');
+    // Укажи нужный размер PNG. 400x1200 для колбы.
+    canvas.width = 400;
+    canvas.height = 1200;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    const link = document.createElement('a');
+    link.download = 'tube.png';
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+};
+</script>
+</body>
+</html>
