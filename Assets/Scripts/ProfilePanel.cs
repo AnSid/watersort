@@ -1,15 +1,14 @@
+using System;
+using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
-using System;
 
-/// <summary>
-/// Панель профиля: имя, страна, награды.
-/// Компонент сам создаёт Canvas на своём GameObject.
-/// Close() уничтожает сам контейнер, поэтому повторное открытие работает.
-/// </summary>
 public class ProfilePanel : MonoBehaviour
 {
     private InputField nameInput;
+    private Image countryFlagImage;
+    private Text countryText;
 
     public void Show()
     {
@@ -20,14 +19,13 @@ public class ProfilePanel : MonoBehaviour
     {
         Canvas canvas = gameObject.AddComponent<Canvas>();
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-        canvas.sortingOrder = 115;
+        canvas.sortingOrder = 130;
         CanvasScaler scaler = gameObject.AddComponent<CanvasScaler>();
         scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
         scaler.referenceResolution = new Vector2(1080, 1920);
         scaler.matchWidthOrHeight = 0.5f;
         gameObject.AddComponent<GraphicRaycaster>();
 
-        // Затемнение
         GameObject bg = new GameObject("BG");
         bg.transform.SetParent(transform, false);
         Image bgImg = bg.AddComponent<Image>();
@@ -38,7 +36,6 @@ public class ProfilePanel : MonoBehaviour
         bgRt.offsetMin = Vector2.zero;
         bgRt.offsetMax = Vector2.zero;
 
-        // Панель
         GameObject panel = new GameObject("Panel");
         panel.transform.SetParent(transform, false);
         Image panelImg = panel.AddComponent<Image>();
@@ -53,17 +50,16 @@ public class ProfilePanel : MonoBehaviour
         pRt.anchorMax = new Vector2(0.5f, 0.5f);
         pRt.pivot = new Vector2(0.5f, 0.5f);
         pRt.anchoredPosition = Vector2.zero;
-        pRt.sizeDelta = new Vector2(860f, 1000f);
+        pRt.sizeDelta = new Vector2(900f, 1500f);
 
-        // Заголовок
-        MakeText(panel.transform, "Профиль", new Vector2(0, 410), 70, FontStyle.Bold,
+        MakeText(panel.transform, "Профиль", new Vector2(0, 660), 70, FontStyle.Bold,
             new Color(0.15f, 0.15f, 0.2f), new Vector2(800, 100), TextAnchor.MiddleCenter);
 
-        // Имя — подпись
-        MakeText(panel.transform, "Имя игрока:", new Vector2(-260, 280), 44, FontStyle.Normal,
-            new Color(0.3f, 0.3f, 0.35f), new Vector2(500, 70), TextAnchor.MiddleLeft);
+        // Подпись — pivot (0, 0.5), x = 30 (отступ от левого края панели).
+        MakeText(panel.transform, "Имя игрока:", new Vector2(30, 520), 40, FontStyle.Normal,
+            new Color(0.3f, 0.3f, 0.35f), new Vector2(500, 60), TextAnchor.MiddleLeft,
+            new Vector2(0f, 0.5f));
 
-        // Поле ввода имени
         GameObject inputObj = new GameObject("NameInput");
         inputObj.transform.SetParent(panel.transform, false);
         Image inputBg = inputObj.AddComponent<Image>();
@@ -72,7 +68,7 @@ public class ProfilePanel : MonoBehaviour
         inRt.anchorMin = new Vector2(0.5f, 0.5f);
         inRt.anchorMax = new Vector2(0.5f, 0.5f);
         inRt.pivot = new Vector2(0.5f, 0.5f);
-        inRt.anchoredPosition = new Vector2(0, 200f);
+        inRt.anchoredPosition = new Vector2(0, 420f);
         inRt.sizeDelta = new Vector2(700, 90);
 
         nameInput = inputObj.AddComponent<InputField>();
@@ -94,7 +90,6 @@ public class ProfilePanel : MonoBehaviour
         nameInput.textComponent = inputText;
         nameInput.text = PlayerProfile.PlayerName;
 
-        // Страна — кнопка
         GameObject countryBtn = new GameObject("CountryButton");
         countryBtn.transform.SetParent(panel.transform, false);
         Image cImg = countryBtn.AddComponent<Image>();
@@ -111,63 +106,109 @@ public class ProfilePanel : MonoBehaviour
         cRt.anchorMin = new Vector2(0.5f, 0.5f);
         cRt.anchorMax = new Vector2(0.5f, 0.5f);
         cRt.pivot = new Vector2(0.5f, 0.5f);
-        cRt.anchoredPosition = new Vector2(0, 70f);
+        cRt.anchoredPosition = new Vector2(0, 290f);
         cRt.sizeDelta = new Vector2(700, 100);
 
-        string countryText = CountryData.GetFlagWithName(PlayerProfile.CountryCode);
+        GameObject flagObj = new GameObject("Flag");
+        flagObj.transform.SetParent(countryBtn.transform, false);
+        countryFlagImage = flagObj.AddComponent<Image>();
+        countryFlagImage.preserveAspect = true;
+        countryFlagImage.raycastTarget = false;
+        RectTransform frt = countryFlagImage.rectTransform;
+        frt.anchorMin = new Vector2(0f, 0.5f);
+        frt.anchorMax = new Vector2(0f, 0.5f);
+        frt.pivot = new Vector2(0f, 0.5f);
+        frt.anchoredPosition = new Vector2(30f, 0f);
+        frt.sizeDelta = new Vector2(70, 50);
+
         GameObject ctObj = new GameObject("Text");
         ctObj.transform.SetParent(countryBtn.transform, false);
-        Text ct = ctObj.AddComponent<Text>();
-        ct.text = countryText;
-        ct.font = UIHelper.Font;
-        ct.fontSize = 44;
-        ct.alignment = TextAnchor.MiddleCenter;
-        ct.color = Color.white;
-        ct.raycastTarget = false;
-        RectTransform ctRt = ct.rectTransform;
+        countryText = ctObj.AddComponent<Text>();
+        countryText.font = UIHelper.Font;
+        countryText.fontSize = 44;
+        countryText.alignment = TextAnchor.MiddleLeft;
+        countryText.color = Color.white;
+        countryText.raycastTarget = false;
+        RectTransform ctRt = countryText.rectTransform;
         ctRt.anchorMin = Vector2.zero;
         ctRt.anchorMax = Vector2.one;
-        ctRt.offsetMin = Vector2.zero;
-        ctRt.offsetMax = Vector2.zero;
+        ctRt.offsetMin = new Vector2(120, 0);
+        ctRt.offsetMax = new Vector2(-20, 0);
+
+        RefreshCountryDisplay();
 
         cBtn.onClick.AddListener(() =>
         {
-            // Удалить старый, если есть
-            Transform old = transform.Find("CountrySelectPanel");
+            Transform parent = transform.parent != null ? transform.parent : transform;
+            Transform old = parent.Find("CountrySelectPanel");
             if (old != null) Destroy(old.gameObject);
 
             GameObject cspObj = new GameObject("CountrySelectPanel");
-            cspObj.transform.SetParent(transform, false);
+            cspObj.transform.SetParent(parent, false);
             CountrySelectPanel csp = cspObj.AddComponent<CountrySelectPanel>();
             csp.Show(() =>
             {
-                ct.text = CountryData.GetFlagWithName(PlayerProfile.CountryCode);
+                RefreshCountryDisplay();
             });
 
-            // Поднять над профилем
             Canvas c = cspObj.GetComponentInChildren<Canvas>(true);
-            if (c != null) c.sortingOrder = 130;
+            if (c != null) c.sortingOrder = 150;
         });
 
-        // Блок наград
-        MakeText(panel.transform, "Награды", new Vector2(0, -60), 50, FontStyle.Bold,
+        MakeText(panel.transform, "Награды", new Vector2(0, 160), 50, FontStyle.Bold,
             new Color(0.15f, 0.15f, 0.2f), new Vector2(700, 70), TextAnchor.MiddleCenter);
 
-        MakeText(panel.transform, "Пока нет наград", new Vector2(0, -140), 40, FontStyle.Normal,
+        MakeText(panel.transform, "Пока нет наград", new Vector2(0, 80), 40, FontStyle.Normal,
             new Color(0.5f, 0.5f, 0.55f), new Vector2(700, 70), TextAnchor.MiddleCenter);
 
-        // Кнопка Сохранить
-        CreateButton(panel.transform, "Сохранить", new Vector2(-180, -400),
+        CreateButton(panel.transform, "Сохранить", new Vector2(-180, -500),
             new Vector2(320, 100), new Color(0.3f, 0.75f, 0.4f), () =>
             {
                 if (nameInput != null && !string.IsNullOrEmpty(nameInput.text))
                     PlayerProfile.PlayerName = nameInput.text.Trim();
+
+                StartCoroutine(PushProfileToLeaderboard());
                 Close();
             });
 
-        // Кнопка Закрыть
-        CreateButton(panel.transform, "Закрыть", new Vector2(180, -400),
+        CreateButton(panel.transform, "Закрыть", new Vector2(180, -500),
             new Vector2(320, 100), new Color(0.6f, 0.6f, 0.65f), Close);
+    }
+
+    void RefreshCountryDisplay()
+    {
+        string code = PlayerProfile.CountryCode;
+
+        Sprite flag = CountryData.GetFlagSprite(code);
+        if (flag != null)
+        {
+            countryFlagImage.sprite = flag;
+            countryFlagImage.enabled = true;
+        }
+        else
+        {
+            countryFlagImage.enabled = false;
+        }
+
+        if (countryText != null)
+            countryText.text = CountryData.GetName(code);
+    }
+
+    IEnumerator PushProfileToLeaderboard()
+    {
+        string deviceId = PlayerProfile.DeviceId;
+        string playerName = PlayerProfile.PlayerName;
+        string countryCode = PlayerProfile.CountryCode;
+
+        int level = PlayerPrefs.GetInt("WaterSort_Level", 1);
+        int score = level * 100;
+
+        yield return LeaderboardAPI.SubmitScore(deviceId, playerName, score, countryCode);
+
+        List<LeaderboardRecord> fresh = null;
+        yield return LeaderboardAPI.GetTopScores(50, result => { fresh = result; });
+        if (fresh != null && fresh.Count > 0)
+            LeaderboardCache.Save(fresh);
     }
 
     void CreateButton(Transform parent, string label, Vector2 pos, Vector2 size, Color color, Action onClick)
@@ -208,7 +249,7 @@ public class ProfilePanel : MonoBehaviour
         trt.offsetMax = Vector2.zero;
     }
 
-    Text MakeText(Transform parent, string content, Vector2 pos, int size, FontStyle style, Color color, Vector2 sizeDelta, TextAnchor align)
+    Text MakeText(Transform parent, string content, Vector2 pos, int size, FontStyle style, Color color, Vector2 sizeDelta, TextAnchor align, Vector2? pivot = null)
     {
         GameObject obj = new GameObject("Text");
         obj.transform.SetParent(parent, false);
@@ -221,9 +262,10 @@ public class ProfilePanel : MonoBehaviour
         t.color = color;
         t.raycastTarget = false;
         RectTransform rt = t.rectTransform;
-        rt.anchorMin = new Vector2(0.5f, 0.5f);
-        rt.anchorMax = new Vector2(0.5f, 0.5f);
-        rt.pivot = new Vector2(0.5f, 0.5f);
+        Vector2 pv = pivot ?? new Vector2(0.5f, 0.5f);
+        rt.anchorMin = pv;
+        rt.anchorMax = pv;
+        rt.pivot = pv;
         rt.anchoredPosition = pos;
         rt.sizeDelta = sizeDelta;
         return t;

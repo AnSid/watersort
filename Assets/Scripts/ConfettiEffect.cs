@@ -9,15 +9,17 @@ using UnityEngine;
 ///
 /// Работает через SpriteRenderer — не зависит от URP/Built-in шейдеров
 /// ParticleSystem. Использует тот же layerSprite, что и колбы.
+///
+/// Добавлено: ClearAll() — принудительно уничтожает текущий салют.
+/// Нужно вызывать при переходе на следующий уровень / restart / addtube,
+/// потому что StopAllCoroutines() в WaterSort обрывает корутину до
+/// Object.Destroy(root), и конфетти остаётся в сцене навсегда.
 /// </summary>
 public static class ConfettiEffect
 {
-    // ---- Параметры салюта ----
     public const int COUNT = 140;
     public const float DURATION = 2.2f;
 
-    // Первые BURST_DURATION сек конфетти разлетаются веером,
-    // потом включается гравитация и они падают.
     public const float BURST_DURATION = 0.4f;
 
     public const float BURST_SPEED_MIN = 3.0f;
@@ -33,38 +35,53 @@ public static class ConfettiEffect
     public const float HEIGHT_MIN = 0.14f;
     public const float HEIGHT_MAX = 0.22f;
 
+    // Текущий контейнер салюта. Живёт, пока корутина Run не завершится
+    // или пока кто-то не вызовет ClearAll().
+    private static GameObject _currentRoot;
+
+    /// <summary>
+    /// Принудительно уничтожить текущий салют, если он есть.
+    /// Безопасно вызывать, когда салюта нет.
+    /// </summary>
+    public static void ClearAll()
+    {
+        if (_currentRoot != null)
+        {
+            Object.Destroy(_currentRoot);
+            _currentRoot = null;
+        }
+    }
+
     /// <summary>
     /// Запустить салют.
     /// </summary>
-    /// <param name="origin">Мировая точка центра взрыва.</param>
-    /// <param name="sprite">Спрайт конфетки (layerSprite — белый квадрат).</param>
-    /// <param name="host">MonoBehaviour, на котором висит корутина.</param>
-    /// <param name="sortingOrder">Sorting order, по умолчанию 25 (поверх колб, под UI).</param>
     public static void Play(Vector3 origin, Sprite sprite, MonoBehaviour host, int sortingOrder = 25)
     {
         if (sprite == null || host == null) return;
+
+        // Если уже был салют — убираем, чтобы не плодить.
+        ClearAll();
+
         host.StartCoroutine(Run(origin, sprite, sortingOrder));
     }
 
     static IEnumerator Run(Vector3 origin, Sprite sprite, int sortingOrder)
     {
-        // Палитра: 8 базовых контрастных + 3 праздничных.
         List<Color> palette = new List<Color>();
         palette.AddRange(ColorPalette.GetContrastingColors(8));
-        palette.Add(new Color(1.00f, 0.85f, 0.20f)); // золотой
-        palette.Add(new Color(0.95f, 0.35f, 0.65f)); // розовый
-        palette.Add(new Color(0.30f, 0.85f, 0.85f)); // бирюзовый
+        palette.Add(new Color(1.00f, 0.85f, 0.20f));
+        palette.Add(new Color(0.95f, 0.35f, 0.65f));
+        palette.Add(new Color(0.30f, 0.85f, 0.85f));
 
-        // Объект-контейнер, чтобы всё разом удалить в конце.
         GameObject root = new GameObject("ConfettiRoot");
         root.transform.position = origin;
+        _currentRoot = root;
 
         List<Transform> transforms = new List<Transform>(COUNT);
         List<SpriteRenderer> renderers = new List<SpriteRenderer>(COUNT);
         List<Vector2> velocities = new List<Vector2>(COUNT);
         List<float> spins = new List<float>(COUNT);
 
-        // Размеры спрайта в мировых единицах (для скейла).
         float spriteW = sprite.bounds.size.x;
         float spriteH = sprite.bounds.size.y;
 
@@ -83,7 +100,6 @@ public static class ConfettiEffect
             float h = Random.Range(HEIGHT_MIN, HEIGHT_MAX);
             obj.transform.localScale = new Vector3(w / spriteW, h / spriteH, 1f);
 
-            // Направление разлёта: веер вверх ±80° от вертикали.
             float angle = Random.Range(-80f, 80f) * Mathf.Deg2Rad;
             float speed = Random.Range(BURST_SPEED_MIN, BURST_SPEED_MAX);
             Vector2 v = new Vector2(Mathf.Sin(angle) * speed, Mathf.Cos(angle) * speed);
@@ -99,13 +115,18 @@ public static class ConfettiEffect
 
         while (elapsed < DURATION)
         {
+            // Если нас принудительно очистили — выходим тихо.
+            if (root == null)
+            {
+                _currentRoot = null;
+                yield break;
+            }
+
             elapsed += Time.deltaTime;
             float dt = Time.deltaTime;
 
-            // Фаза разлёта: скорость умножается на плавно затухающий фактор,
-            // гравитация ещё не действует. После BURST_DURATION — обычное падение.
             float burstT = Mathf.Clamp01(elapsed / BURST_DURATION);
-            float burstDamp = 1f - burstT; // линейное затухание толчка
+            float burstDamp = 1f - burstT;
 
             for (int i = 0; i < COUNT; i++)
             {
@@ -117,16 +138,12 @@ public static class ConfettiEffect
 
                 if (elapsed < BURST_DURATION)
                 {
-                    // Толчок затухает
                     pos += new Vector3(v.x, v.y, 0f) * burstDamp * dt;
                 }
                 else
                 {
-                    // Падение с гравитацией
                     v.y += GRAVITY * dt;
                     pos += new Vector3(v.x, v.y, 0f) * dt;
-
-                    // Горизонтальное затухание (трение воздуха)
                     v.x *= 1f - 0.6f * dt;
                     velocities[i] = v;
                 }
@@ -134,10 +151,8 @@ public static class ConfettiEffect
                 pos.z = 0f;
                 tr.position = pos;
 
-                // Вращение
                 tr.Rotate(0f, 0f, spins[i] * dt);
 
-                // Fade-out: плавно с 60% длительности
                 float life = elapsed / DURATION;
                 float alpha = life < 0.6f ? 1f : Mathf.Lerp(1f, 0f, (life - 0.6f) / 0.4f);
                 Color c = renderers[i].color;
@@ -148,6 +163,8 @@ public static class ConfettiEffect
             yield return null;
         }
 
-        Object.Destroy(root);
+        if (root != null)
+            Object.Destroy(root);
+        _currentRoot = null;
     }
 }

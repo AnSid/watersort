@@ -8,6 +8,7 @@ public class WaterSort : MonoBehaviour
     private const int LAYERS_PER_TUBE = 4;
     private const int MAX_PER_ROW = 7;
     private const int MAX_TUBES = 14;
+    private const int MAX_UNDO = 5;
 
     private const float TUBE_SPACING = 0.9f;
     private const float ROW_SPACING = 3.0f;
@@ -17,6 +18,7 @@ public class WaterSort : MonoBehaviour
     private int TUBE_COUNT = 5;
     private int COLOR_COUNT = 3;
     private List<List<int>> tubes = new List<List<int>>();
+    private List<List<int>> initialTubes = new List<List<int>>();
     private List<TubeVisual> tubeVisuals = new List<TubeVisual>();
     private List<GameObject> spawnedObjects = new List<GameObject>();
     private List<Vector3> tubePositions = new List<Vector3>();
@@ -24,13 +26,15 @@ public class WaterSort : MonoBehaviour
     private bool gameWon = false;
     private bool isAnimating = false;
 
-    // Клик во время анимации: скипаем анимацию и обрабатываем клик,
-    // когда isAnimating снова станет false.
+    private int undoUsedCount = 0;
+    private bool tubeAdded = false;
+
     private bool pendingClick = false;
 
     private Color[] colors;
 
-    // Стек ходов для Undo
+    private bool[] wasSolved;
+
     private struct MoveRecord { public int from; public int to; public int count; }
     private Stack<MoveRecord> moveHistory = new Stack<MoveRecord>();
 
@@ -38,14 +42,17 @@ public class WaterSort : MonoBehaviour
     private Image winPanel;
     private GameObject nextButtonObj;
     private Camera cam;
-    private CountrySelectPanel countryPanel;
     private Toolbar toolbar;
     private Transform uiCanvas;
 
     private AudioSource audioSource;
+    private AudioSource musicSource;
+    private bool lastMusicEnabled;
     public AudioClip clickSound;
     public AudioClip pourSound;
     public AudioClip winSound;
+    public AudioClip capCloseSound;
+    public AudioClip musicClip;
 
     public Sprite tubeSprite;
     public Sprite capSprite;
@@ -64,7 +71,6 @@ public class WaterSort : MonoBehaviour
         SetupAudio();
         SetupToolbar();
         SetupWinUI();
-        SetupCountryPanel();
 
         int saved = PlayerPrefs.GetInt("WaterSort_Level", 1);
         LoadLevel(saved);
@@ -82,13 +88,44 @@ public class WaterSort : MonoBehaviour
         if (clickSound == null) clickSound = Resources.Load<AudioClip>("Sounds/click");
         if (pourSound == null) pourSound = Resources.Load<AudioClip>("Sounds/pour");
         if (winSound == null) winSound = Resources.Load<AudioClip>("Sounds/win");
+        if (capCloseSound == null) capCloseSound = Resources.Load<AudioClip>("Sounds/cap_close");
+
+        musicSource = gameObject.AddComponent<AudioSource>();
+        musicSource.playOnAwake = false;
+        musicSource.loop = true;
+        musicSource.volume = 0.4f;
+
+        if (musicClip == null) musicClip = Resources.Load<AudioClip>("Sounds/music");
+        musicSource.clip = musicClip;
+
+        lastMusicEnabled = GameSettings.MusicEnabled;
+        UpdateMusicState();
+    }
+
+    void UpdateMusicState()
+    {
+        if (musicSource == null || musicSource.clip == null) return;
+
+        if (GameSettings.MusicEnabled)
+        {
+            if (!musicSource.isPlaying) musicSource.Play();
+        }
+        else
+        {
+            if (musicSource.isPlaying) musicSource.Pause();
+        }
     }
 
     void PlaySound(AudioClip clip)
     {
+        PlaySound(clip, 1f);
+    }
+
+    void PlaySound(AudioClip clip, float volume)
+    {
         if (!GameSettings.SoundEnabled) return;
         if (clip != null && audioSource != null)
-            audioSource.PlayOneShot(clip);
+            audioSource.PlayOneShot(clip, volume);
     }
 
     void SetupLighting()
@@ -130,11 +167,16 @@ public class WaterSort : MonoBehaviour
 
     void AdjustCameraToFitTubes()
     {
-        float worldWidth = (MAX_PER_ROW - 1) * TUBE_SPACING + 1.6f;
+        int rows = (TUBE_COUNT <= MAX_PER_ROW) ? 1 : 2;
+        int perRow = (rows == 1) ? TUBE_COUNT : Mathf.CeilToInt(TUBE_COUNT / 2f);
+
+        float worldWidth = (perRow - 1) * TUBE_SPACING + 1.6f;
         float screenAspect = (float)Screen.width / Screen.height;
         float sizeByWidth = worldWidth / (2f * screenAspect);
 
-        float heightNeeded = ROW_SPACING + TubeVisual.TUBE_HEIGHT + 2.5f;
+        float heightNeeded = (rows == 1)
+            ? (TubeVisual.TUBE_HEIGHT + 4.5f)
+            : (ROW_SPACING + TubeVisual.TUBE_HEIGHT + 4.5f);
         float sizeByHeight = heightNeeded / 2f;
 
         cam.orthographicSize = Mathf.Max(sizeByWidth, sizeByHeight);
@@ -160,9 +202,9 @@ public class WaterSort : MonoBehaviour
 
         toolbar.OnSettingsClicked += OpenSettings;
         toolbar.OnLeaderboardClicked += OpenLeaderboard;
+        toolbar.OnAddTubeClicked += OnAddTubeClicked;
         toolbar.OnUndoClicked += OnUndoClicked;
-        toolbar.OnHintClicked += OnHintClicked;
-        toolbar.OnRefreshClicked += () => { PlaySound(clickSound); StartNewGameInternal(); };
+        toolbar.OnRefreshClicked += RestartLevel;
     }
 
     void SetupWinUI()
@@ -239,15 +281,6 @@ public class WaterSort : MonoBehaviour
         nextButtonObj.SetActive(false);
     }
 
-    void SetupCountryPanel()
-    {
-        GameObject panelObj = new GameObject("CountrySelectPanel");
-        panelObj.transform.SetParent(transform, false);
-        countryPanel = panelObj.AddComponent<CountrySelectPanel>();
-        // Панель при старте не показываем — страна ставится автоматически в TryAutoSetup().
-        // Пользователь может открыть её вручную через Настройки → Профиль → Страна.
-    }
-
     void OpenSettings()
     {
         if (transform.Find("SettingsPanel") != null) return;
@@ -274,7 +307,7 @@ public class WaterSort : MonoBehaviour
         GameObject lpObj = new GameObject("LeaderboardPanel");
         lpObj.transform.SetParent(transform, false);
         LeaderboardPanel lp = lpObj.AddComponent<LeaderboardPanel>();
-        lp.Show();
+        lp.Show(OpenProfile);
     }
 
     void ResetProgress()
@@ -283,10 +316,6 @@ public class WaterSort : MonoBehaviour
         PlayerPrefs.Save();
         LoadLevel(1);
     }
-
-    // ============================================================
-    // Уровни
-    // ============================================================
 
     void LoadLevel(int level)
     {
@@ -303,8 +332,18 @@ public class WaterSort : MonoBehaviour
 
         colors = ColorPalette.GetContrastingColors(COLOR_COUNT);
 
-        if (toolbar != null) toolbar.SetLevel(currentLevel);
+        if (toolbar != null)
+        {
+            toolbar.SetLevel(currentLevel);
+            toolbar.SetUndoEnabled(false);
+            toolbar.SetAddTubeEnabled(false);
+        }
+
+        undoUsedCount = 0;
+        tubeAdded = false;
+
         StartNewGameInternal();
+        RefreshTopFromCache();
     }
 
     void NextLevel()
@@ -315,6 +354,9 @@ public class WaterSort : MonoBehaviour
 
     void StartNewGameInternal()
     {
+        // Убираем возможный остаток конфетти от прошлого салюта.
+        ConfettiEffect.ClearAll();
+
         StopAllCoroutines();
         isAnimating = false;
         pendingClick = false;
@@ -331,6 +373,7 @@ public class WaterSort : MonoBehaviour
         selectedTube = -1;
         gameWon = false;
         moveHistory.Clear();
+        wasSolved = null;
 
         if (winText != null) winText.gameObject.SetActive(false);
         if (winPanel != null) winPanel.gameObject.SetActive(false);
@@ -339,10 +382,23 @@ public class WaterSort : MonoBehaviour
         int cc, tc, ss;
         LevelGenerator.GetLevelParams(currentLevel, out cc, out tc, out ss);
 
-        tubes = LevelGenerator.Generate(cc, tc, 0);
+        tubes = LevelGenerator.Generate(cc, tc, ss);
+        TUBE_COUNT = tubes.Count;
+
+        initialTubes = CloneTubes(tubes);
 
         if (toolbar != null) toolbar.SetHint("Выбери колбочку");
         CreateTubeVisuals();
+        UpdateButtonStates();
+
+        wasSolved = new bool[TUBE_COUNT];
+    }
+
+    List<List<int>> CloneTubes(List<List<int>> src)
+    {
+        var c = new List<List<int>>(src.Count);
+        foreach (var t in src) c.Add(new List<int>(t));
+        return c;
     }
 
     void CalculateTubePositions()
@@ -390,12 +446,14 @@ public class WaterSort : MonoBehaviour
         }
     }
 
-    // ============================================================
-    // Ввод
-    // ============================================================
-
     void Update()
     {
+        if (lastMusicEnabled != GameSettings.MusicEnabled)
+        {
+            lastMusicEnabled = GameSettings.MusicEnabled;
+            UpdateMusicState();
+        }
+
         if (gameWon) return;
 
         if (Input.GetMouseButtonDown(0))
@@ -516,10 +574,6 @@ public class WaterSort : MonoBehaviour
         return Mathf.Min(count, freeSpace);
     }
 
-    // ============================================================
-    // Перелив
-    // ============================================================
-
     IEnumerator PourAnimation(int from, int to)
     {
         isAnimating = true;
@@ -567,12 +621,14 @@ public class WaterSort : MonoBehaviour
         toolbar.SetHint("Выбери колбочку");
         isAnimating = false;
 
+        CheckNewlySolvedTubes();
+        UpdateButtonStates();
         CheckWin();
     }
 
     void HighlightTargets(int from)
     {
-        for (int i = 0; i < TUBE_COUNT; i++)
+        for (int i = 0; i < tubeVisuals.Count; i++)
         {
             if (i == from) continue;
             if (CanPour(from, i))
@@ -582,13 +638,9 @@ public class WaterSort : MonoBehaviour
 
     void ClearHighlights()
     {
-        for (int i = 0; i < TUBE_COUNT; i++)
+        for (int i = 0; i < tubeVisuals.Count; i++)
             tubeVisuals[i].SetHighlight(false);
     }
-
-    // ============================================================
-    // Undo / Hint
-    // ============================================================
 
     void OnUndoClicked()
     {
@@ -596,6 +648,12 @@ public class WaterSort : MonoBehaviour
         if (isAnimating)
         {
             PourAnimator.RequestSkip();
+            return;
+        }
+        if (undoUsedCount >= MAX_UNDO)
+        {
+            toolbar.SetHint("Отмены закончились (макс. " + MAX_UNDO + ")");
+            PlaySound(clickSound);
             return;
         }
         if (moveHistory.Count == 0)
@@ -620,80 +678,150 @@ public class WaterSort : MonoBehaviour
 
         selectedTube = -1;
         ClearHighlights();
-        toolbar.SetHint("Ход отменён");
+        undoUsedCount++;
+        toolbar.SetHint("Ход отменён (" + (MAX_UNDO - undoUsedCount) + " осталось)");
         PlaySound(clickSound);
+
+        CheckNewlySolvedTubes();
+        UpdateButtonStates();
     }
 
-    void OnHintClicked()
+    void OnAddTubeClicked()
     {
         if (gameWon) return;
         if (isAnimating) return;
-
-        List<(int from, int to)> valid = new List<(int, int)>();
-        for (int from = 0; from < TUBE_COUNT; from++)
+        if (tubeAdded)
         {
-            if (tubes[from].Count == 0) continue;
-            if (IsTubeSolved(from)) continue;
-
-            for (int to = 0; to < TUBE_COUNT; to++)
-            {
-                if (to == from) continue;
-                if (!CanPour(from, to)) continue;
-                if (IsUselessMove(from, to)) continue;
-
-                valid.Add((from, to));
-            }
+            toolbar.SetHint("Колбочку можно добавить 1 раз за раунд");
+            PlaySound(clickSound);
+            return;
         }
-
-        if (valid.Count == 0)
+        if (TUBE_COUNT >= MAX_TUBES)
         {
-            toolbar.SetHint("Ходов нет. Нажми ⟳ для нового поля");
+            toolbar.SetHint("Достигнут максимум колбочек (" + MAX_TUBES + ")");
             PlaySound(clickSound);
             return;
         }
 
-        var pick = valid[Random.Range(0, valid.Count)];
-        StartCoroutine(ShowHint(pick.from, pick.to));
+        tubeAdded = true;
+        TUBE_COUNT++;
+        tubes.Add(new List<int>());
+
+        ConfettiEffect.ClearAll();
+
+        foreach (GameObject obj in spawnedObjects)
+            if (obj != null) Destroy(obj);
+        spawnedObjects.Clear();
+        tubeVisuals.Clear();
+
+        CalculateTubePositions();
+        AdjustCameraToFitTubes();
+
+        for (int i = 0; i < TUBE_COUNT; i++)
+        {
+            GameObject tubeObj = new GameObject("Tube_" + i);
+            spawnedObjects.Add(tubeObj);
+
+            TubeVisual tv = tubeObj.AddComponent<TubeVisual>();
+            tv.Setup(i, tubePositions[i], colors, tubeSprite, capSprite, layerSprite, layerBottomSprite);
+            tv.SetLayers(tubes[i]);
+            tubeVisuals.Add(tv);
+        }
+
+        System.Array.Resize(ref wasSolved, TUBE_COUNT);
+
+        selectedTube = -1;
+        ClearHighlights();
+        toolbar.SetHint("Добавлена колбочка (+1)");
+        PlaySound(clickSound);
+
+        UpdateButtonStates();
     }
 
-    bool IsTubeSolved(int index)
+    void RestartLevel()
     {
-        var t = tubes[index];
+        if (isAnimating)
+        {
+            PourAnimator.RequestSkip();
+            return;
+        }
+
+        PlaySound(clickSound);
+
+        ConfettiEffect.ClearAll();
+
+        StopAllCoroutines();
+        isAnimating = false;
+        pendingClick = false;
+        PourAnimator.ResetSkip();
+
+        tubes = CloneTubes(initialTubes);
+        TUBE_COUNT = tubes.Count;
+
+        selectedTube = -1;
+        gameWon = false;
+        moveHistory.Clear();
+        undoUsedCount = 0;
+        tubeAdded = false;
+        wasSolved = new bool[TUBE_COUNT];
+
+        if (winText != null) winText.gameObject.SetActive(false);
+        if (winPanel != null) winPanel.gameObject.SetActive(false);
+        if (nextButtonObj != null) nextButtonObj.SetActive(false);
+
+        foreach (GameObject obj in spawnedObjects)
+            if (obj != null) Destroy(obj);
+        spawnedObjects.Clear();
+        tubeVisuals.Clear();
+
+        CalculateTubePositions();
+        AdjustCameraToFitTubes();
+
+        for (int i = 0; i < TUBE_COUNT; i++)
+        {
+            GameObject tubeObj = new GameObject("Tube_" + i);
+            spawnedObjects.Add(tubeObj);
+
+            TubeVisual tv = tubeObj.AddComponent<TubeVisual>();
+            tv.Setup(i, tubePositions[i], colors, tubeSprite, capSprite, layerSprite, layerBottomSprite);
+            tv.SetLayers(tubes[i]);
+            tubeVisuals.Add(tv);
+        }
+
+        toolbar.SetHint("Уровень сброшен");
+        UpdateButtonStates();
+    }
+
+    void UpdateButtonStates()
+    {
+        if (toolbar == null) return;
+        toolbar.SetUndoEnabled(!gameWon && undoUsedCount < MAX_UNDO && moveHistory.Count > 0);
+        toolbar.SetAddTubeEnabled(!gameWon && !tubeAdded && TUBE_COUNT < MAX_TUBES);
+    }
+
+    bool IsTubeSolved(List<int> t)
+    {
         if (t.Count != LAYERS_PER_TUBE) return false;
         for (int i = 1; i < t.Count; i++)
             if (t[i] != t[0]) return false;
         return true;
     }
 
-    bool IsUselessMove(int from, int to)
+    void CheckNewlySolvedTubes()
     {
-        if (tubes[to].Count == 0)
+        if (wasSolved == null || wasSolved.Length != TUBE_COUNT)
+            wasSolved = new bool[TUBE_COUNT];
+
+        for (int i = 0; i < TUBE_COUNT; i++)
         {
-            bool allSame = true;
-            int first = tubes[from][0];
-            for (int i = 1; i < tubes[from].Count; i++)
-                if (tubes[from][i] != first) { allSame = false; break; }
-            if (allSame) return true;
+            bool nowSolved = IsTubeSolved(tubes[i]);
+            if (nowSolved && !wasSolved[i])
+            {
+                PlaySound(capCloseSound, 0.7f);
+            }
+            wasSolved[i] = nowSolved;
         }
-        return false;
     }
-
-    IEnumerator ShowHint(int from, int to)
-    {
-        tubeVisuals[from].SetHint(true);
-        tubeVisuals[to].SetHint(true);
-        toolbar.SetHint($"Подсказка: {from + 1} → {to + 1}");
-
-        yield return new WaitForSeconds(1.5f);
-
-        tubeVisuals[from].SetHint(false);
-        tubeVisuals[to].SetHint(false);
-        toolbar.SetHint("Выбери колбочку");
-    }
-
-    // ============================================================
-    // Победа
-    // ============================================================
 
     void CheckWin()
     {
@@ -707,6 +835,7 @@ public class WaterSort : MonoBehaviour
         }
 
         gameWon = true;
+        UpdateButtonStates();
         PlaySound(winSound);
         StartCoroutine(WinAnimation());
         StartCoroutine(SubmitScoreAfterWin());
@@ -720,6 +849,22 @@ public class WaterSort : MonoBehaviour
         int score = currentLevel * 100;
 
         yield return LeaderboardAPI.SubmitScore(deviceId, playerName, score, countryCode);
+
+        List<LeaderboardRecord> fresh = null;
+        yield return LeaderboardAPI.GetTopScores(50, result => { fresh = result; });
+
+        if (fresh != null && fresh.Count > 0)
+        {
+            LeaderboardCache.Save(fresh);
+            int pos = LeaderboardCache.GetPlayerPosition(deviceId);
+            if (toolbar != null) toolbar.SetTop(pos);
+        }
+    }
+
+    void RefreshTopFromCache()
+    {
+        int pos = LeaderboardCache.GetPlayerPosition(PlayerProfile.DeviceId);
+        if (toolbar != null) toolbar.SetTop(pos);
     }
 
     IEnumerator WinAnimation()
@@ -729,7 +874,6 @@ public class WaterSort : MonoBehaviour
         if (winPanel != null) winPanel.gameObject.SetActive(true);
         winText.gameObject.SetActive(true);
 
-        // ---- Конфетти-салют ----
         if (layerSprite != null && cam != null)
         {
             Vector3 origin = new Vector3(0f, cam.transform.position.y + 1.0f, 0f);

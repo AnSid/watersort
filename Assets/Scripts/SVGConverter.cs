@@ -177,6 +177,210 @@ public class SVGConverter : MonoBehaviour
         SavePNG(tex, "tube.png");
     }
 
+    // ==================== КОЛБА V2 ====================
+    // Отличия от V1:
+    //  - тело колбы (где жидкость) — alpha 0, цвет не искажается;
+    //  - кромки слева/справа — плотнее (0.55), границы колбы читаются;
+    //  - горлышко и ободок — 0.5–0.65;
+    //  - блики — как в V1, но поверх кромок;
+    //  - дно — 0.45.
+    // Сохраняется в tube_v2.png, оригинал tube.png не трогается.
+
+    [ContextMenu("Generate Tube V2 PNG")]
+    public void GenerateTubeV2()
+    {
+        int W = 400;
+        int H = 1200;
+        Texture2D tex = new Texture2D(W, H, TextureFormat.RGBA32, false);
+
+        Color[] clear = new Color[W * H];
+        for (int i = 0; i < clear.Length; i++) clear[i] = new Color(0, 0, 0, 0);
+        tex.SetPixels(clear);
+
+        float scaleX = W / 200f;
+        float scaleY = H / 600f;
+
+        float bodyLeft = 55, bodyRight = 145;
+        float bodyTop = 56, bodyBottom = 545;
+
+        // Ширина кромки в SVG-координатах: 8 единиц (≈10% от ширины тела 90).
+        float edgeW = 8f;
+
+        for (int y = 0; y < H; y++)
+        {
+            float svgY = y / scaleY;
+            if (svgY < bodyTop || svgY > bodyBottom) continue;
+
+            // Скругление дна — как в V1.
+            float bottomCurve = 1f;
+            if (svgY > bodyBottom - 30)
+            {
+                float d = (svgY - (bodyBottom - 30)) / 30f;
+                bottomCurve = Mathf.Sqrt(Mathf.Max(0, 1f - d * d));
+            }
+
+            float leftShift = (1f - bottomCurve) * 45f;
+            float l = bodyLeft + leftShift;
+            float r = bodyRight - leftShift;
+
+            for (int x = 0; x < W; x++)
+            {
+                float svgX = x / scaleX;
+                if (svgX < l || svgX > r) continue;
+
+                float fromLeft = svgX - l;
+                float fromRight = r - svgX;
+                float fromEdge = Mathf.Min(fromLeft, fromRight);
+
+                if (fromEdge >= edgeW)
+                {
+                    // Тело — полностью прозрачное, чтобы не искажать жидкость.
+                    continue;
+                }
+
+                // Кромка: у самого края alpha 0.55, к внутренней границе — 0.
+                float t = fromEdge / edgeW; // 0 = внешний край, 1 = внутренняя граница
+                float alpha = Mathf.Lerp(0.55f, 0f, t);
+
+                // Лёгкий голубовато-серый оттенок стекла.
+                Color c = new Color(0.78f, 0.82f, 0.86f, alpha);
+                tex.SetPixel(x, H - 1 - y, c);
+            }
+        }
+
+        // Горлышко — плотнее, 0.5.
+        float neckTop = 34, neckBottom = 56;
+        float neckTopLeft = 76, neckTopRight = 124;
+        float neckBotLeft = 72, neckBotRight = 128;
+
+        for (int y = 0; y < H; y++)
+        {
+            float svgY = y / scaleY;
+            if (svgY < neckTop || svgY > neckBottom) continue;
+
+            float t = (svgY - neckTop) / (neckBottom - neckTop);
+            float l = Mathf.Lerp(neckTopLeft, neckBotLeft, t);
+            float r = Mathf.Lerp(neckTopRight, neckBotRight, t);
+
+            for (int x = 0; x < W; x++)
+            {
+                float svgX = x / scaleX;
+                if (svgX < l || svgX > r) continue;
+
+                // У горлышка — сплошная плотность 0.5 (стекло видно).
+                Color c = new Color(0.80f, 0.84f, 0.88f, 0.50f);
+                tex.SetPixel(x, H - 1 - y, c);
+            }
+        }
+
+        // Ободок — плотнее, 0.65.
+        float rimTop = 20, rimBottom = 36;
+        float rimLeft = 66, rimRight = 134;
+        float rimRadius = 7f;
+
+        for (int y = 0; y < H; y++)
+        {
+            float svgY = y / scaleY;
+            if (svgY < rimTop || svgY > rimBottom) continue;
+
+            for (int x = 0; x < W; x++)
+            {
+                float svgX = x / scaleX;
+                if (svgX < rimLeft || svgX > rimRight) continue;
+
+                bool inside = true;
+                float rl = rimLeft + rimRadius;
+                float rr = rimRight - rimRadius;
+                float rt = rimTop + rimRadius;
+                float rb = rimBottom - rimRadius;
+
+                if (svgX < rl && svgY < rt)
+                    inside = Vector2.Distance(new Vector2(svgX, svgY), new Vector2(rl, rt)) <= rimRadius;
+                else if (svgX > rr && svgY < rt)
+                    inside = Vector2.Distance(new Vector2(svgX, svgY), new Vector2(rr, rt)) <= rimRadius;
+                else if (svgX < rl && svgY > rb)
+                    inside = Vector2.Distance(new Vector2(svgX, svgY), new Vector2(rl, rb)) <= rimRadius;
+                else if (svgX > rr && svgY > rb)
+                    inside = Vector2.Distance(new Vector2(svgX, svgY), new Vector2(rr, rb)) <= rimRadius;
+
+                if (!inside) continue;
+
+                float tt = (svgX - rimLeft) / (rimRight - rimLeft);
+                Color g = RimGradient(tt);
+                g.a = 0.65f;
+                tex.SetPixel(x, H - 1 - y, g);
+            }
+        }
+
+        // Дно — эллипс, alpha 0.45 (как V1).
+        float cx = 100, cy = 543;
+        float rx = 44, ry = 8;
+        for (int y = 0; y < H; y++)
+        {
+            float svgY = y / scaleY;
+            for (int x = 0; x < W; x++)
+            {
+                float svgX = x / scaleX;
+                float dx = (svgX - cx) / rx;
+                float dy = (svgY - cy) / ry;
+                float dist = dx * dx + dy * dy;
+                if (dist <= 1f)
+                {
+                    float alpha = (1f - dist) * 0.45f;
+                    Color c = new Color(0.32f, 0.45f, 0.58f, alpha);
+                    BlendPixel(tex, x, H - 1 - y, c);
+                }
+            }
+        }
+
+        // Блик 1 (левый, широкий) — 0.30 вместо 0.25, поверх кромки.
+        for (int y = 0; y < H; y++)
+        {
+            float svgY = y / scaleY;
+            if (svgY < 70 || svgY > 520) continue;
+            for (int x = 0; x < W; x++)
+            {
+                float svgX = x / scaleX;
+                if (svgX < 62 || svgX > 82) continue;
+
+                float distFromCenter = (svgX - 71f) / 8f;
+                float alpha = Mathf.Exp(-distFromCenter * distFromCenter * 2f) * 0.30f;
+
+                float edgeFade = 1f;
+                if (svgY < 100) edgeFade = (svgY - 70) / 30f;
+                if (svgY > 490) edgeFade = (520 - svgY) / 30f;
+
+                Color c = new Color(1f, 1f, 1f, alpha * edgeFade);
+                BlendPixel(tex, x, H - 1 - y, c);
+            }
+        }
+
+        // Блик 2 (правый, узкий) — 0.18 вместо 0.14.
+        for (int y = 0; y < H; y++)
+        {
+            float svgY = y / scaleY;
+            if (svgY < 120 || svgY > 460) continue;
+            for (int x = 0; x < W; x++)
+            {
+                float svgX = x / scaleX;
+                if (svgX < 124 || svgX > 138) continue;
+
+                float distFromCenter = (svgX - 131f) / 6f;
+                float alpha = Mathf.Exp(-distFromCenter * distFromCenter * 2f) * 0.18f;
+
+                float edgeFade = 1f;
+                if (svgY < 140) edgeFade = (svgY - 120) / 20f;
+                if (svgY > 440) edgeFade = (460 - svgY) / 20f;
+
+                Color c = new Color(1f, 1f, 1f, alpha * edgeFade);
+                BlendPixel(tex, x, H - 1 - y, c);
+            }
+        }
+
+        tex.Apply();
+        SavePNG(tex, "tube_v2.png");
+    }
+
     // ==================== КРЫШКА ====================
 
     [ContextMenu("Generate Cap PNG")]

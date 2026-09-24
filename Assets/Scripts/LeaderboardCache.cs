@@ -54,4 +54,21 @@ public static class LeaderboardCache
         PlayerPrefs.DeleteKey(KEY);
         PlayerPrefs.Save();
     }
+
+    /// <summary>
+    /// Позиция игрока в закэшированном топе.
+    /// Возвращает 1-based позицию или -1, если игрок не найден.
+    /// </summary>
+    public static int GetPlayerPosition(string deviceId)
+    {
+        if (string.IsNullOrEmpty(deviceId)) return -1;
+        var list = Load();
+        if (list == null) return -1;
+        for (int i = 0; i < list.Count; i++)
+        {
+            if (list[i] != null && list[i].device_id == deviceId)
+                return i + 1;
+        }
+        return -1;
+    }
 }

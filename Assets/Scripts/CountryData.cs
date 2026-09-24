@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using UnityEngine;
 
 public static class CountryData
 {
@@ -74,7 +75,18 @@ public static class CountryData
     };
 
     /// <summary>
-    /// Эмодзи-флаг по ISO-коду (любому 2-буквенному).
+    /// PNG-спрайт флага из Assets/Resources/Flags/.
+    /// Имена файлов — lowercase ISO-код: ru.png, us.png, de.png.
+    /// Если файла нет — возвращает null (вызывающий код показывает текстовый код).
+    /// </summary>
+    public static Sprite GetFlagSprite(string code)
+    {
+        if (string.IsNullOrEmpty(code) || code.Length != 2) return null;
+        return Resources.Load<Sprite>("Flags/" + code.ToLower());
+    }
+
+    /// <summary>
+    /// Эмодзи-флаг — оставлен для fallback-случая, но на Android может не отображаться.
     /// </summary>
     public static string GetFlag(string code)
     {
@@ -96,8 +108,6 @@ public static class CountryData
 
     /// <summary>
     /// Страна по умолчанию из региона устройства.
-    /// Возвращает реальный ISO-код региона (даже если его нет в списке).
-    /// Если регион не определился — "RU".
     /// </summary>
     public static string GetDefaultCountryCode()
     {
@@ -112,7 +122,7 @@ public static class CountryData
     }
 
     /// <summary>
-    /// Флаг + название. Для стран вне списка — "🇨🇭 Неизвестная страна (CH)".
+    /// Флаг + название. Используется в текстовых местах, где нельзя вставить Image.
     /// </summary>
     public static string GetFlagWithName(string code)
     {

@@ -12,9 +12,13 @@ public class LeaderboardPanel : MonoBehaviour
 {
     private Transform contentRoot;
     private Text statusText;
+    private System.Action onProfileRequested;
 
-    public void Show()
+    public void Show() { Show(null); }
+
+    public void Show(System.Action onProfileRequested)
     {
+        this.onProfileRequested = onProfileRequested;
         BuildUI();
         StartCoroutine(LoadScores());
     }
@@ -127,14 +131,21 @@ public class LeaderboardPanel : MonoBehaviour
         statusText = MakeCenteredText(panel.transform, "", new Vector2(0, 590), 34, FontStyle.Italic,
             new Color(0.5f, 0.5f, 0.55f), new Vector2(800, 60));
 
-        CreateButton(panel.transform, "Обновить", new Vector2(-180, -660),
-            new Vector2(320, 100), new Color(0.3f, 0.55f, 0.85f), () =>
+        // Три кнопки внизу: Мой профиль / Обновить / Закрыть
+        CreateButton(panel.transform, "Мой профиль", new Vector2(-280, -660),
+            new Vector2(280, 100), new Color(0.85f, 0.65f, 0.25f), () =>
+            {
+                onProfileRequested?.Invoke();
+            });
+
+        CreateButton(panel.transform, "Обновить", new Vector2(0, -660),
+            new Vector2(280, 100), new Color(0.3f, 0.55f, 0.85f), () =>
             {
                 StartCoroutine(LoadScores());
             });
 
-        CreateButton(panel.transform, "Закрыть", new Vector2(180, -660),
-            new Vector2(320, 100), new Color(0.6f, 0.6f, 0.65f), Close);
+        CreateButton(panel.transform, "Закрыть", new Vector2(280, -660),
+            new Vector2(280, 100), new Color(0.6f, 0.6f, 0.65f), Close);
     }
 
     IEnumerator LoadScores()
@@ -205,20 +216,37 @@ public class LeaderboardPanel : MonoBehaviour
         le.minHeight = 90;
         le.preferredHeight = 90;
 
-        // Место
         MakeRowText(row.transform, place.ToString(), new Vector2(20, 0), 38, FontStyle.Bold,
             new Color(0.2f, 0.2f, 0.3f), new Vector2(60, 90));
 
-        // Код страны
-        string code = string.IsNullOrEmpty(rec.country_code) ? "—" : rec.country_code.ToUpper();
-        MakeRowText(row.transform, code, new Vector2(100, 0), 38, FontStyle.Bold,
-            new Color(0.3f, 0.55f, 0.85f), new Vector2(70, 90));
+        // Флаг (PNG-спрайт), fallback — текстовый код
+        Sprite flag = CountryData.GetFlagSprite(rec.country_code);
+        if (flag != null)
+        {
+            GameObject flagObj = new GameObject("Flag");
+            flagObj.transform.SetParent(row.transform, false);
+            Image flagImg = flagObj.AddComponent<Image>();
+            flagImg.sprite = flag;
+            flagImg.preserveAspect = true;
+            flagImg.raycastTarget = false;
 
-        // Имя
+            RectTransform frt = flagImg.rectTransform;
+            frt.anchorMin = new Vector2(0f, 0.5f);
+            frt.anchorMax = new Vector2(0f, 0.5f);
+            frt.pivot = new Vector2(0f, 0.5f);
+            frt.anchoredPosition = new Vector2(100f, 0f);
+            frt.sizeDelta = new Vector2(56, 40);
+        }
+        else
+        {
+            string code = string.IsNullOrEmpty(rec.country_code) ? "—" : rec.country_code.ToUpper();
+            MakeRowText(row.transform, code, new Vector2(100, 0), 38, FontStyle.Bold,
+                new Color(0.3f, 0.55f, 0.85f), new Vector2(70, 90));
+        }
+
         MakeRowText(row.transform, rec.player_name ?? "—", new Vector2(200, 0), 38, FontStyle.Normal,
             new Color(0.15f, 0.15f, 0.2f), new Vector2(440, 90));
 
-        // Очки — правый край
         MakeRowTextRight(row.transform, rec.score.ToString(), new Vector2(-20, 0), 38, FontStyle.Bold,
             new Color(0.3f, 0.55f, 0.85f), new Vector2(160, 90));
     }
@@ -319,7 +347,7 @@ public class LeaderboardPanel : MonoBehaviour
         Text t = textObj.AddComponent<Text>();
         t.text = label;
         t.font = UIHelper.Font;
-        t.fontSize = 44;
+        t.fontSize = 40;
         t.alignment = TextAnchor.MiddleCenter;
         t.color = Color.white;
         t.raycastTarget = false;

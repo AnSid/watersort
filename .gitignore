@@ -8,7 +8,7 @@
 [Uu]serSettings/
 [Mm]emoryCaptures/
 [Rr]ecordings/
-Docs/releases/
+Docs/
 
 # Asset meta data (если считаешь префабы/сцены бинарными — оставь как есть)
 # *.meta — НЕ игнорируем, они нужны для Unity!

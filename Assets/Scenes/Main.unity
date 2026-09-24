@@ -207,10 +207,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3837ded3bdfac374b842ea86e7c1b98d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::WaterSort
-  clickSound: {fileID: 8300000, guid: ee6ab2a9fc2f02641a7bbd5370cdfcfb, type: 3}
-  pourSound: {fileID: 8300000, guid: bca0007600de9e048ac27b3c0c7cbe7a, type: 3}
-  winSound: {fileID: 8300000, guid: c8853ca5353f2714185251bf6acd4d36, type: 3}
-  tubeSprite: {fileID: 4536015807284659308, guid: a478dff2f26f6cf49bef7b42400ddc19, type: 3}
+  clickSound: {fileID: 8300000, guid: c57811cd53e54144fbeaea93aae4d479, type: 3}
+  pourSound: {fileID: 8300000, guid: 76d6551632ec9bc409675491786fc97d, type: 3}
+  winSound: {fileID: 8300000, guid: 1d4ecf829ae656a4088adb011d62b898, type: 3}
+  capCloseSound: {fileID: 8300000, guid: 198c63867e49d3348a6d4ddbc7e396a3, type: 3}
+  musicClip: {fileID: 8300000, guid: 49c170bfa6bb02440a36cb689f27e2cc, type: 3}
+  tubeSprite: {fileID: 6650691944459708567, guid: c7d7f18475f90cf48ab490ce9b28d8db, type: 3}
   capSprite: {fileID: 21300000, guid: e882010ff1aceea42b262eb4d15cff9f, type: 3}
   layerSprite: {fileID: -5009293899458642114, guid: ee7e49203f8866c4ab55386541088a55, type: 3}
   layerBottomSprite: {fileID: 21300000, guid: 8c52ae70864f3644c9c05e8af54ef51a, type: 3}
