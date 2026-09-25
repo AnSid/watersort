@@ -9,7 +9,7 @@ public static class LevelGenerator
     {
         int emptyTubes = tubeCount - colorCount;
         if (emptyTubes < 1) emptyTubes = 1;
-        if (emptyTubes > 2) emptyTubes = 2;
+        if (emptyTubes > 3) emptyTubes = 3;
 
         int baseSeed = Environment.TickCount ^ (colorCount * 73856093) ^ (tubeCount * 19349663);
 
@@ -218,7 +218,8 @@ public static class LevelGenerator
         else if (level <= 18) { colors = 9; empty = 2; }
         else if (level <= 20) { colors = 10; empty = 2; }
         else if (level <= 25) { colors = 11; empty = 2; }
-        else { colors = 12; empty = 2; }
+        else if (level <= 30) { colors = 12; empty = 2; }   // 26–30: 14 колб
+        else { colors = 13; empty = 2; }                    // 31+ : 15 колб, 13 цветов
 
         colorCount = colors;
         tubeCount = colors + empty;

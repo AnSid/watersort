@@ -205,9 +205,18 @@ public class LeaderboardPanel : MonoBehaviour
         row.transform.SetParent(contentRoot, false);
 
         Image rowImg = row.AddComponent<Image>();
-        rowImg.color = (place % 2 == 1)
-            ? new Color(1f, 1f, 1f, 0.6f)
-            : new Color(0.92f, 0.92f, 0.95f, 0.6f);
+        bool isMe = (rec.device_id == PlayerProfile.DeviceId);
+        if (isMe)
+        {
+            // Своя строка — светло-зелёная, чтобы сразу видеть себя в списке.
+            rowImg.color = new Color(0.65f, 0.92f, 0.65f, 0.85f);
+        }
+        else
+        {
+            rowImg.color = (place % 2 == 1)
+                ? new Color(1f, 1f, 1f, 0.6f)
+                : new Color(0.92f, 0.92f, 0.95f, 0.6f);
+        }
 
         RectTransform rt = row.GetComponent<RectTransform>();
         rt.sizeDelta = new Vector2(0, 90);

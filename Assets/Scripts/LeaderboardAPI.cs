@@ -31,10 +31,10 @@ public static class LeaderboardAPI
     private const int TIMEOUT_SECONDS = 10;
 
     /// <summary>
-    /// Upsert по device_id:
-    /// - если запись есть и score >= нового — пропускаем;
-    /// - если запись есть и score < нового — PATCH (score, name, country);
-    /// - если записи нет — POST.
+    /// Upsert по device_id.
+    /// Если запись есть — PATCH: score, player_name, country_code
+    /// (score ставится абсолютным значением, не «только если больше»).
+    /// Если записи нет — POST.
     /// </summary>
     public static IEnumerator SubmitScore(
         string deviceId,
@@ -66,19 +66,14 @@ public static class LeaderboardAPI
             }
         }
 
-        // 2. Если запись есть и score >= нового — ничего не делаем
-        if (existing != null && existing.score >= score)
-        {
-            Debug.Log($"[Leaderboard] {playerName}: score {existing.score} >= {score}, пропускаем.");
-            onComplete?.Invoke(true);
-            yield break;
-        }
-
-        // 3. PATCH — обновляем score, name, country
+        // 2. Если запись есть — PATCH: всегда ставим актуальные score, имя, страну
         if (existing != null)
         {
             string patchUrl = $"{BASE_URL}/api/collections/{COLLECTION}/records/{existing.id}";
-            string patchJson = $"{{\"score\":{score},\"player_name\":\"{EscapeJson(playerName)}\",\"country_code\":\"{EscapeJson(countryCode)}\"}}";
+            string patchJson =
+                $"{{\"score\":{score}," +
+                $"\"player_name\":\"{EscapeJson(playerName)}\"," +
+                $"\"country_code\":\"{EscapeJson(countryCode)}\"}}";
 
             using (UnityWebRequest req = new UnityWebRequest(patchUrl, "PATCH"))
             {
@@ -91,7 +86,7 @@ public static class LeaderboardAPI
 
                 if (req.result == UnityWebRequest.Result.Success)
                 {
-                    Debug.Log($"[Leaderboard] Обновлено: {playerName} {existing.score} -> {score}");
+                    Debug.Log($"[Leaderboard] Обновлено: {playerName}, score = {score}");
                     onComplete?.Invoke(true);
                 }
                 else
@@ -103,7 +98,7 @@ public static class LeaderboardAPI
             yield break;
         }
 
-        // 4. POST — создаём новую запись
+        // 3. POST — создаём новую запись
         string postUrl = $"{BASE_URL}/api/collections/{COLLECTION}/records";
         string postJson = $"{{\"device_id\":\"{EscapeJson(deviceId)}\",\"player_name\":\"{EscapeJson(playerName)}\",\"score\":{score},\"country_code\":\"{EscapeJson(countryCode)}\"}}";
 

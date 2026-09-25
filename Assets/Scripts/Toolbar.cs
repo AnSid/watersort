@@ -246,6 +246,7 @@ public class Toolbar : MonoBehaviour
     // Цвет цифры уровня по диапазону сложности.
     // Логика совпадает с LevelGenerator.GetLevelParams:
     //   чем выше уровень — тем «горячее» цвет.
+    // 26+ — ярко-розовый: на синем фоне топбара тёмно-фиолетовый сливался.
     Color GetLevelColor(int level)
     {
         if (level <= 4) return new Color(0.35f, 0.85f, 0.40f); // зелёный
@@ -256,7 +257,21 @@ public class Toolbar : MonoBehaviour
         if (level <= 18) return new Color(0.95f, 0.30f, 0.30f); // красный
         if (level <= 20) return new Color(0.90f, 0.30f, 0.55f); // красно-розовый
         if (level <= 25) return new Color(0.75f, 0.40f, 0.85f); // фиолетовый
-        return new Color(0.60f, 0.45f, 0.95f);                  // тёмно-фиолетовый
+        return new Color(0.95f, 0.45f, 0.75f);                  // ярко-розовый (26+)
+    }
+
+    // Цвет цифры позиции в рейтинге.
+    // Топ-3 — праздничные цвета, дальше градация по «уровню успеха».
+    // 11–50 — светло-жёлтый (а не голубой): на синем фоне голубой сливается.
+    Color GetTopColor(int top)
+    {
+        if (top <= 0) return Color.white;
+        if (top == 1) return new Color(1.00f, 0.85f, 0.30f); // золотой
+        if (top == 2) return new Color(0.85f, 0.85f, 0.90f); // серебряный
+        if (top == 3) return new Color(0.85f, 0.55f, 0.30f); // бронзовый
+        if (top <= 10) return new Color(0.40f, 0.85f, 0.45f); // зелёный
+        if (top <= 50) return new Color(1.00f, 0.90f, 0.50f); // светло-жёлтый
+        return Color.white;                                    // >50 — белый
     }
 
     private int _level = 1;
@@ -283,7 +298,10 @@ public class Toolbar : MonoBehaviour
         }
 
         if (topText != null)
+        {
             topText.text = _top > 0 ? _top.ToString() : "—";
+            topText.color = GetTopColor(_top);
+        }
     }
 
     public void SetHint(string text)

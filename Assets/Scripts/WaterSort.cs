@@ -7,7 +7,7 @@ public class WaterSort : MonoBehaviour
 {
     private const int LAYERS_PER_TUBE = 4;
     private const int MAX_PER_ROW = 7;
-    private const int MAX_TUBES = 14;
+    private const int MAX_TUBES = 16;
     private const int MAX_UNDO = 5;
 
     private const float TUBE_SPACING = 0.9f;
@@ -60,6 +60,8 @@ public class WaterSort : MonoBehaviour
     public Sprite layerBottomSprite;
     public Sprite roundedButtonSprite;
 
+    private Rect _lastSafeArea;
+
     void Start()
     {
         UIHelper.RoundedButtonSprite = roundedButtonSprite;
@@ -71,6 +73,10 @@ public class WaterSort : MonoBehaviour
         SetupAudio();
         SetupToolbar();
         SetupWinUI();
+
+        // Если есть несинхронизированные баллы — попробуем отправить при старте.
+        if (ScoreManager.IsDirty)
+            StartCoroutine(SyncScoreIfDirty());
 
         int saved = PlayerPrefs.GetInt("WaterSort_Level", 1);
         LoadLevel(saved);
@@ -162,6 +168,7 @@ public class WaterSort : MonoBehaviour
         cam.backgroundColor = new Color(0.94f, 0.94f, 0.96f);
         cam.clearFlags = CameraClearFlags.SolidColor;
 
+        _lastSafeArea = Screen.safeArea;
         AdjustCameraToFitTubes();
     }
 
@@ -171,7 +178,17 @@ public class WaterSort : MonoBehaviour
         int perRow = (rows == 1) ? TUBE_COUNT : Mathf.CeilToInt(TUBE_COUNT / 2f);
 
         float worldWidth = (perRow - 1) * TUBE_SPACING + 1.6f;
-        float screenAspect = (float)Screen.width / Screen.height;
+
+        Rect sa = Screen.safeArea;
+        float safeW = sa.width;
+        float safeH = sa.height;
+        if (safeW <= 0f || safeH <= 0f)
+        {
+            safeW = Screen.width;
+            safeH = Screen.height;
+        }
+
+        float screenAspect = safeW / safeH;
         float sizeByWidth = worldWidth / (2f * screenAspect);
 
         float heightNeeded = (rows == 1)
@@ -315,6 +332,7 @@ public class WaterSort : MonoBehaviour
         PlayerPrefs.SetInt("WaterSort_Level", 1);
         PlayerPrefs.Save();
         LoadLevel(1);
+        // ScoreManager не трогаем — счёт и MaxLevelReached сохраняются.
     }
 
     void LoadLevel(int level)
@@ -330,7 +348,7 @@ public class WaterSort : MonoBehaviour
         TUBE_COUNT = tubeCount;
         if (TUBE_COUNT > MAX_TUBES) TUBE_COUNT = MAX_TUBES;
 
-        colors = ColorPalette.GetContrastingColors(COLOR_COUNT);
+        colors = ColorPalette.GetContrastingColors(COLOR_COUNT, currentLevel);
 
         if (toolbar != null)
         {
@@ -354,7 +372,6 @@ public class WaterSort : MonoBehaviour
 
     void StartNewGameInternal()
     {
-        // Убираем возможный остаток конфетти от прошлого салюта.
         ConfettiEffect.ClearAll();
 
         StopAllCoroutines();
@@ -444,10 +461,19 @@ public class WaterSort : MonoBehaviour
             tv.SetLayers(tubes[i]);
             tubeVisuals.Add(tv);
         }
+
+        AdjustCameraToFitTubes();
     }
 
     void Update()
     {
+        Rect sa = Screen.safeArea;
+        if (sa != _lastSafeArea)
+        {
+            _lastSafeArea = sa;
+            AdjustCameraToFitTubes();
+        }
+
         if (lastMusicEnabled != GameSettings.MusicEnabled)
         {
             lastMusicEnabled = GameSettings.MusicEnabled;
@@ -843,12 +869,19 @@ public class WaterSort : MonoBehaviour
 
     IEnumerator SubmitScoreAfterWin()
     {
+        // Начисляем баллы, если уровень новый. Повторное прохождение — 0.
+        ScoreManager.AddPointsForLevel(currentLevel);
+
         string deviceId = PlayerProfile.DeviceId;
         string playerName = PlayerProfile.PlayerName;
         string countryCode = PlayerProfile.CountryCode;
-        int score = currentLevel * 100;
+        int totalScore = ScoreManager.TotalScore;
 
-        yield return LeaderboardAPI.SubmitScore(deviceId, playerName, score, countryCode);
+        yield return LeaderboardAPI.SubmitScore(deviceId, playerName, totalScore, countryCode,
+            success =>
+            {
+                if (success) ScoreManager.MarkSynced();
+            });
 
         List<LeaderboardRecord> fresh = null;
         yield return LeaderboardAPI.GetTopScores(50, result => { fresh = result; });
@@ -859,6 +892,22 @@ public class WaterSort : MonoBehaviour
             int pos = LeaderboardCache.GetPlayerPosition(deviceId);
             if (toolbar != null) toolbar.SetTop(pos);
         }
+    }
+
+    IEnumerator SyncScoreIfDirty()
+    {
+        if (!ScoreManager.IsDirty) yield break;
+
+        string deviceId = PlayerProfile.DeviceId;
+        string playerName = PlayerProfile.PlayerName;
+        string countryCode = PlayerProfile.CountryCode;
+        int totalScore = ScoreManager.TotalScore;
+
+        yield return LeaderboardAPI.SubmitScore(deviceId, playerName, totalScore, countryCode,
+            success =>
+            {
+                if (success) ScoreManager.MarkSynced();
+            });
     }
 
     void RefreshTopFromCache()

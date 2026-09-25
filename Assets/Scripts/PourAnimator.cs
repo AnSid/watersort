@@ -27,7 +27,7 @@ public static class PourAnimator
     // ---- Параметры струи (обновлены) ----
     public const float STREAM_START_WIDTH = 0.10f;
     public const float STREAM_END_WIDTH = 0.07f;
-    public const float STREAM_ALPHA = 0.50f;
+    public const float STREAM_ALPHA = 0.9f;
     public const int STREAM_POINTS = 10;
     public const float STREAM_CURVE = 0.05f;
     public const float STREAM_WOBBLE_AMP = 0.025f;

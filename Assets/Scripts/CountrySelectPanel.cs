@@ -39,26 +39,9 @@ public class CountrySelectPanel : MonoBehaviour
         bgRt.offsetMin = Vector2.zero;
         bgRt.offsetMax = Vector2.zero;
 
-        // Заголовок — ниже тулбара (тулбар 120, ставим -160).
-        GameObject titleObj = new GameObject("Title");
-        titleObj.transform.SetParent(transform, false);
-        Text title = titleObj.AddComponent<Text>();
-        title.text = "Выберите страну";
-        title.font = UIHelper.Font;
-        title.fontSize = 60;
-        title.fontStyle = FontStyle.Bold;
-        title.alignment = TextAnchor.MiddleCenter;
-        title.color = Color.white;
-        title.raycastTarget = false;
-        RectTransform titleRt = title.rectTransform;
-        titleRt.anchorMin = new Vector2(0.5f, 1f);
-        titleRt.anchorMax = new Vector2(0.5f, 1f);
-        titleRt.pivot = new Vector2(0.5f, 1f);
-        titleRt.anchoredPosition = new Vector2(0, -160);
-        titleRt.sizeDelta = new Vector2(900, 100);
-
-        // Белая панель — от заголовка до кнопки "Отмена".
-        // Верх на -280 (под заголовком), низ на +160 (над кнопкой).
+        // Белое окошко. Растянуто по вертикали: от 60px снизу до 220px сверху.
+        // По ширине — фиксированные 900px по центру.
+        // Заголовок, поиск, скролл и кнопка — ВСЕ внутри этого окошка.
         GameObject panelObj = new GameObject("Panel");
         panelObj.transform.SetParent(transform, false);
         Image panelImg = panelObj.AddComponent<Image>();
@@ -73,10 +56,28 @@ public class CountrySelectPanel : MonoBehaviour
         panelRt.anchorMax = new Vector2(0.5f, 1f);
         panelRt.pivot = new Vector2(0.5f, 0.5f);
         panelRt.anchoredPosition = new Vector2(0, 0);
-        panelRt.offsetMin = new Vector2(-450, 160);  // низ панели
-        panelRt.offsetMax = new Vector2(450, -280);  // верх панели
+        panelRt.offsetMin = new Vector2(-450, 60);
+        panelRt.offsetMax = new Vector2(450, -220);
 
-        // --- Поле поиска ---
+        // Заголовок — внутри панели, у её верхнего края.
+        GameObject titleObj = new GameObject("Title");
+        titleObj.transform.SetParent(panelObj.transform, false);
+        Text title = titleObj.AddComponent<Text>();
+        title.text = "Выберите страну";
+        title.font = UIHelper.Font;
+        title.fontSize = 60;
+        title.fontStyle = FontStyle.Bold;
+        title.alignment = TextAnchor.MiddleCenter;
+        title.color = new Color(0.15f, 0.15f, 0.2f);
+        title.raycastTarget = false;
+        RectTransform titleRt = title.rectTransform;
+        titleRt.anchorMin = new Vector2(0.5f, 1f);
+        titleRt.anchorMax = new Vector2(0.5f, 1f);
+        titleRt.pivot = new Vector2(0.5f, 1f);
+        titleRt.anchoredPosition = new Vector2(0, -20);
+        titleRt.sizeDelta = new Vector2(900, 100);
+
+        // --- Поле поиска (внутри панели, под заголовком) ---
         GameObject searchObj = new GameObject("SearchInput");
         searchObj.transform.SetParent(panelObj.transform, false);
         Image searchBg = searchObj.AddComponent<Image>();
@@ -90,8 +91,8 @@ public class CountrySelectPanel : MonoBehaviour
         searchRt.anchorMin = new Vector2(0f, 1f);
         searchRt.anchorMax = new Vector2(1f, 1f);
         searchRt.pivot = new Vector2(0.5f, 1f);
-        searchRt.anchoredPosition = new Vector2(0, -20f);
-        searchRt.sizeDelta = new Vector2(-40f, 90f); // -40 = по 20 отступ слева/справа
+        searchRt.anchoredPosition = new Vector2(0, -130f);
+        searchRt.sizeDelta = new Vector2(-40f, 90f);
 
         searchInput = searchObj.AddComponent<InputField>();
 
@@ -129,14 +130,14 @@ public class CountrySelectPanel : MonoBehaviour
         searchInput.placeholder = searchPlaceholder;
         searchInput.onValueChanged.AddListener(OnSearchChanged);
 
-        // --- ScrollRect ---
+        // --- ScrollRect (внутри панели, между поиском и кнопкой) ---
         GameObject scrollObj = new GameObject("ScrollView");
         scrollObj.transform.SetParent(panelObj.transform, false);
         RectTransform scrollRt = scrollObj.AddComponent<RectTransform>();
         scrollRt.anchorMin = Vector2.zero;
         scrollRt.anchorMax = Vector2.one;
-        scrollRt.offsetMin = new Vector2(20, 20);    // низ/лево панели
-        scrollRt.offsetMax = new Vector2(-20, -130); // верх: под полем поиска (90 + 20 + 20)
+        scrollRt.offsetMin = new Vector2(20, 160);   // низ: место под кнопку
+        scrollRt.offsetMax = new Vector2(-20, -240); // верх: под заголовком и поиском
 
         ScrollRect scroll = scrollObj.AddComponent<ScrollRect>();
         scroll.horizontal = false;
@@ -146,17 +147,15 @@ public class CountrySelectPanel : MonoBehaviour
         scroll.inertia = true;
         scroll.decelerationRate = 0.135f;
 
-        // Viewport с RectMask2D — надёжнее Mask.
         GameObject viewport = new GameObject("Viewport");
         viewport.transform.SetParent(scrollObj.transform, false);
         RectTransform vpRt = viewport.AddComponent<RectTransform>();
         vpRt.anchorMin = Vector2.zero;
         vpRt.anchorMax = Vector2.one;
         vpRt.offsetMin = Vector2.zero;
-        vpRt.offsetMax = new Vector2(-25, 0); // оставляем место под скроллбар справа
+        vpRt.offsetMax = new Vector2(-25, 0);
         viewport.AddComponent<RectMask2D>();
 
-        // Content
         GameObject content = new GameObject("Content");
         content.transform.SetParent(viewport.transform, false);
         RectTransform contentRt = content.AddComponent<RectTransform>();
@@ -225,8 +224,8 @@ public class CountrySelectPanel : MonoBehaviour
         // Строим список
         RebuildList(null);
 
-        // Кнопка Отмена — на самом низу экрана, вне панели.
-        CreateCancelButton();
+        // Кнопка Отмена — внутри панели, у её нижнего края.
+        CreateCancelButton(panelObj.transform);
     }
 
     void OnSearchChanged(string query)
@@ -256,7 +255,6 @@ public class CountrySelectPanel : MonoBehaviour
             CreateCountryButton(country.code, country.name);
         }
 
-        // Сбросить скролл наверх после перестроения.
         Canvas.ForceUpdateCanvases();
         ScrollRect sr = contentRoot.GetComponentInParent<ScrollRect>();
         if (sr != null) sr.verticalNormalizedPosition = 1f;
@@ -321,10 +319,10 @@ public class CountrySelectPanel : MonoBehaviour
         textRt.offsetMax = new Vector2(-30, 0);
     }
 
-    void CreateCancelButton()
+    void CreateCancelButton(Transform parent)
     {
         GameObject btnObj = new GameObject("CancelButton");
-        btnObj.transform.SetParent(transform, false);
+        btnObj.transform.SetParent(parent, false);
 
         Image img = btnObj.AddComponent<Image>();
         img.color = new Color(0.6f, 0.6f, 0.65f);
@@ -358,8 +356,6 @@ public class CountrySelectPanel : MonoBehaviour
         textRt.anchorMax = Vector2.one;
         textRt.offsetMin = Vector2.zero;
         textRt.offsetMax = Vector2.zero;
-
-        btnObj.transform.SetAsLastSibling();
     }
 
     void OnCountrySelected(string code)

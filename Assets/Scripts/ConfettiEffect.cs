@@ -68,7 +68,7 @@ public static class ConfettiEffect
     static IEnumerator Run(Vector3 origin, Sprite sprite, int sortingOrder)
     {
         List<Color> palette = new List<Color>();
-        palette.AddRange(ColorPalette.GetContrastingColors(8));
+        palette.AddRange(ColorPalette.GetContrastingColors(8, Random.Range(0, 100000)));
         palette.Add(new Color(1.00f, 0.85f, 0.20f));
         palette.Add(new Color(0.95f, 0.35f, 0.65f));
         palette.Add(new Color(0.30f, 0.85f, 0.85f));

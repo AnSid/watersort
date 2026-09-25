@@ -96,7 +96,6 @@ public class TubeVisual : MonoBehaviour
 
         if (capSprite != null)
         {
-            // Крышка — плоская, низкая и широкая: почти во всю ширину колбы.
             float spriteWidth = capSprite.bounds.size.x;
             float spriteHeight = capSprite.bounds.size.y;
             float scaleX = (TUBE_WIDTH * 0.95f) / spriteWidth;
@@ -181,7 +180,7 @@ public class TubeVisual : MonoBehaviour
 
     public Vector3 GetMouthEdgeWorldPosition(float sideSign)
     {
-        float halfNeckWidth = TUBE_WIDTH * 0.12f;
+        float halfNeckWidth = TUBE_WIDTH * 0.266f;
         Vector3 localEdge = new Vector3(sideSign * halfNeckWidth, TUBE_HEIGHT / 2f, 0f);
         return transform.TransformPoint(localEdge);
     }

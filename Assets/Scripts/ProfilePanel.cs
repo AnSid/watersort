@@ -55,7 +55,6 @@ public class ProfilePanel : MonoBehaviour
         MakeText(panel.transform, "Профиль", new Vector2(0, 660), 70, FontStyle.Bold,
             new Color(0.15f, 0.15f, 0.2f), new Vector2(800, 100), TextAnchor.MiddleCenter);
 
-        // Подпись — pivot (0, 0.5), x = 30 (отступ от левого края панели).
         MakeText(panel.transform, "Имя игрока:", new Vector2(30, 520), 40, FontStyle.Normal,
             new Color(0.3f, 0.3f, 0.35f), new Vector2(500, 60), TextAnchor.MiddleLeft,
             new Vector2(0f, 0.5f));
@@ -199,11 +198,13 @@ public class ProfilePanel : MonoBehaviour
         string deviceId = PlayerProfile.DeviceId;
         string playerName = PlayerProfile.PlayerName;
         string countryCode = PlayerProfile.CountryCode;
+        int totalScore = ScoreManager.TotalScore;
 
-        int level = PlayerPrefs.GetInt("WaterSort_Level", 1);
-        int score = level * 100;
-
-        yield return LeaderboardAPI.SubmitScore(deviceId, playerName, score, countryCode);
+        yield return LeaderboardAPI.SubmitScore(deviceId, playerName, totalScore, countryCode,
+            success =>
+            {
+                if (success) ScoreManager.MarkSynced();
+            });
 
         List<LeaderboardRecord> fresh = null;
         yield return LeaderboardAPI.GetTopScores(50, result => { fresh = result; });
