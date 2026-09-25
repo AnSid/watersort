@@ -180,7 +180,7 @@ public class TubeVisual : MonoBehaviour
 
     public Vector3 GetMouthEdgeWorldPosition(float sideSign)
     {
-        float halfNeckWidth = TUBE_WIDTH * 0.266f;
+        float halfNeckWidth = TUBE_WIDTH * 0.5f;
         Vector3 localEdge = new Vector3(sideSign * halfNeckWidth, TUBE_HEIGHT / 2f, 0f);
         return transform.TransformPoint(localEdge);
     }
