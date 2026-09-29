@@ -216,6 +216,7 @@ MonoBehaviour:
   capSprite: {fileID: 21300000, guid: e882010ff1aceea42b262eb4d15cff9f, type: 3}
   layerSprite: {fileID: -5009293899458642114, guid: ee7e49203f8866c4ab55386541088a55, type: 3}
   layerBottomSprite: {fileID: 21300000, guid: 8c52ae70864f3644c9c05e8af54ef51a, type: 3}
+  layerTopSprite: {fileID: 0}
   roundedButtonSprite: {fileID: 21300000, guid: 3fce277e4d2778041884852f8904047d, type: 3}
 --- !u!1 &1856717835
 GameObject:

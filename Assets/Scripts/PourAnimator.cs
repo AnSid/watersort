@@ -2,10 +2,6 @@ using UnityEngine;
 using System;
 using System.Collections;
 
-/// <summary>
-/// Отвечает ТОЛЬКО за визуал перелива.
-/// Струя растёт сверху вниз, оканчивается на уровне жидкости в приёмнике.
-/// </summary>
 public static class PourAnimator
 {
     public const bool DEBUG = false;
@@ -24,7 +20,7 @@ public static class PourAnimator
     public const float HOVER_HEIGHT = 0.5f;
     public const float DELAY_BETWEEN_LAYERS = 0.10f;
 
-    // ---- Параметры струи (обновлены) ----
+    // ---- Параметры струи ----
     public const float STREAM_START_WIDTH = 0.10f;
     public const float STREAM_END_WIDTH = 0.07f;
     public const float STREAM_ALPHA = 0.9f;
@@ -32,9 +28,8 @@ public static class PourAnimator
     public const float STREAM_CURVE = 0.05f;
     public const float STREAM_WOBBLE_AMP = 0.025f;
     public const float STREAM_WOBBLE_SPEED = 22f;
-    public const float STREAM_GROW_DURATION = 0.15f; // время «прорастания» струи сверху вниз
+    public const float STREAM_GROW_DURATION = 0.15f;
 
-    // ---- Кэш материала ----
     private static Material _streamMaterial;
     private static Material StreamMaterial
     {
@@ -55,6 +50,9 @@ public static class PourAnimator
         Func<GameObject> onAddToTarget)
     {
         skipRequested = false;
+
+        // Поднимаем исходную колбу поверх остальных на время анимации.
+        if (fromTV != null) fromTV.SetPouring(true);
 
         Vector3 fromOriginalPos = fromTV.transform.position;
         Quaternion fromOriginalRot = fromTV.transform.rotation;
@@ -114,7 +112,7 @@ public static class PourAnimator
         }
         pivotObj.transform.rotation = endRot;
 
-        // 4. Струя (создаём LineRenderer сразу, длину будем «растить»)
+        // 4. Струя
         GameObject streamObj = null;
         LineRenderer lr = null;
         float curveDir = dir;
@@ -139,7 +137,6 @@ public static class PourAnimator
             widthCurve.AddKey(1f, STREAM_END_WIDTH);
             lr.widthCurve = widthCurve;
 
-            // Стартуем с нулевой длины — все точки в горлышке
             Vector3 startPos = fromTV.GetMouthEdgeWorldPosition(dir);
             for (int p = 0; p < STREAM_POINTS; p++)
                 lr.SetPosition(p, startPos);
@@ -164,11 +161,9 @@ public static class PourAnimator
 
             if (!skipRequested)
             {
-                // Точка старта — горлышко источника
                 Vector3 streamStart = fromTV.GetMouthEdgeWorldPosition(dir);
 
-                // Точка конца — уровень жидкости в приёмнике (а не горлышко)
-                float surfaceLocalY = layerBaseY + halfLayerH; // уровень поверхности слоя
+                float surfaceLocalY = layerBaseY + halfLayerH;
                 Vector3 surfaceWorld = toTV.transform.TransformPoint(new Vector3(0f, surfaceLocalY, 0f));
                 Vector3 streamEnd = new Vector3(surfaceWorld.x, surfaceWorld.y, 0f);
 
@@ -181,7 +176,6 @@ public static class PourAnimator
                     t += Time.deltaTime / FLOW_DURATION;
                     float ease = Mathf.Clamp01(t);
 
-                    // Растим длину струи за STREAM_GROW_DURATION
                     if (growProgress < 1f)
                     {
                         growProgress += Time.deltaTime / STREAM_GROW_DURATION;
@@ -196,8 +190,6 @@ public static class PourAnimator
                         for (int p = 0; p < STREAM_POINTS; p++)
                         {
                             float pt = (float)p / (STREAM_POINTS - 1);
-                            // Каждая точка «проявляется» со сдвигом по growProgress
-                            // точка 0 — сразу, последняя — при growProgress = 1
                             float visibleT = Mathf.Clamp01((growProgress - pt * 0.15f) / 0.85f);
 
                             Vector3 pos = Vector3.Lerp(streamStart, streamEnd, pt * visibleT);
@@ -269,6 +261,9 @@ public static class PourAnimator
         fromTV.transform.rotation = fromOriginalRot;
 
         UnityEngine.Object.Destroy(pivotObj);
+
+        // Опускаем исходную колбу обратно.
+        if (fromTV != null) fromTV.SetPouring(false);
 
         skipRequested = false;
     }

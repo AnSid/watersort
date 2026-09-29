@@ -178,13 +178,6 @@ public class SVGConverter : MonoBehaviour
     }
 
     // ==================== КОЛБА V2 ====================
-    // Отличия от V1:
-    //  - тело колбы (где жидкость) — alpha 0, цвет не искажается;
-    //  - кромки слева/справа — плотнее (0.55), границы колбы читаются;
-    //  - горлышко и ободок — 0.5–0.65;
-    //  - блики — как в V1, но поверх кромок;
-    //  - дно — 0.45.
-    // Сохраняется в tube_v2.png, оригинал tube.png не трогается.
 
     [ContextMenu("Generate Tube V2 PNG")]
     public void GenerateTubeV2()
@@ -203,7 +196,6 @@ public class SVGConverter : MonoBehaviour
         float bodyLeft = 55, bodyRight = 145;
         float bodyTop = 56, bodyBottom = 545;
 
-        // Ширина кромки в SVG-координатах: 8 единиц (≈10% от ширины тела 90).
         float edgeW = 8f;
 
         for (int y = 0; y < H; y++)
@@ -211,7 +203,6 @@ public class SVGConverter : MonoBehaviour
             float svgY = y / scaleY;
             if (svgY < bodyTop || svgY > bodyBottom) continue;
 
-            // Скругление дна — как в V1.
             float bottomCurve = 1f;
             if (svgY > bodyBottom - 30)
             {
@@ -234,21 +225,17 @@ public class SVGConverter : MonoBehaviour
 
                 if (fromEdge >= edgeW)
                 {
-                    // Тело — полностью прозрачное, чтобы не искажать жидкость.
                     continue;
                 }
 
-                // Кромка: у самого края alpha 0.55, к внутренней границе — 0.
-                float t = fromEdge / edgeW; // 0 = внешний край, 1 = внутренняя граница
-                float alpha = Mathf.Lerp(0.55f, 0f, t);
+                float t = fromEdge / edgeW;
+                float alpha = Mathf.Lerp(0.70f, 0f, t);
 
-                // Лёгкий голубовато-серый оттенок стекла.
-                Color c = new Color(0.78f, 0.82f, 0.86f, alpha);
+                Color c = new Color(0.55f, 0.62f, 0.72f, alpha);
                 tex.SetPixel(x, H - 1 - y, c);
             }
         }
 
-        // Горлышко — плотнее, 0.5.
         float neckTop = 34, neckBottom = 56;
         float neckTopLeft = 76, neckTopRight = 124;
         float neckBotLeft = 72, neckBotRight = 128;
@@ -267,13 +254,11 @@ public class SVGConverter : MonoBehaviour
                 float svgX = x / scaleX;
                 if (svgX < l || svgX > r) continue;
 
-                // У горлышка — сплошная плотность 0.5 (стекло видно).
-                Color c = new Color(0.80f, 0.84f, 0.88f, 0.50f);
+                Color c = new Color(0.60f, 0.66f, 0.76f, 0.65f);
                 tex.SetPixel(x, H - 1 - y, c);
             }
         }
 
-        // Ободок — плотнее, 0.65.
         float rimTop = 20, rimBottom = 36;
         float rimLeft = 66, rimRight = 134;
         float rimRadius = 7f;
@@ -307,12 +292,14 @@ public class SVGConverter : MonoBehaviour
 
                 float tt = (svgX - rimLeft) / (rimRight - rimLeft);
                 Color g = RimGradient(tt);
-                g.a = 0.65f;
+                g.a = 0.75f;
+                g.r *= 0.85f;
+                g.g *= 0.85f;
+                g.b *= 0.85f;
                 tex.SetPixel(x, H - 1 - y, g);
             }
         }
 
-        // Дно — эллипс, alpha 0.45 (как V1).
         float cx = 100, cy = 543;
         float rx = 44, ry = 8;
         for (int y = 0; y < H; y++)
@@ -333,7 +320,6 @@ public class SVGConverter : MonoBehaviour
             }
         }
 
-        // Блик 1 (левый, широкий) — 0.30 вместо 0.25, поверх кромки.
         for (int y = 0; y < H; y++)
         {
             float svgY = y / scaleY;
@@ -355,7 +341,6 @@ public class SVGConverter : MonoBehaviour
             }
         }
 
-        // Блик 2 (правый, узкий) — 0.18 вместо 0.14.
         for (int y = 0; y < H; y++)
         {
             float svgY = y / scaleY;
@@ -387,102 +372,155 @@ public class SVGConverter : MonoBehaviour
     public void GenerateCap()
     {
         int W = 256;
-        int H = 96;
+        int H = 192;
         Texture2D tex = new Texture2D(W, H, TextureFormat.RGBA32, false);
 
         Color[] clear = new Color[W * H];
         for (int i = 0; i < clear.Length; i++) clear[i] = new Color(0, 0, 0, 0);
         tex.SetPixels(clear);
 
-        float topTop = 0.00f * H;
-        float topBottom = 0.40f * H;
-        float topLeft = 0.00f * W;
-        float topRight = 1.00f * W;
-        float topRadius = 0.20f * W;
+        float capWidth = 70f;
+        float capHeight = 28f;
+        float stemWidth = 59f;
+        float stemHeight = 20f;
 
-        float baseLeft = 0.04f * W;
-        float baseRight = 0.96f * W;
-        float baseTop = 0.40f * H;
-        float baseBottom = 1.00f * H;
-        float baseRadius = 0.03f * W;
+        float pxPerSvgX = W / 90f;
+        float pxPerSvgY = H / 40f;
+
+        float capW_px = capWidth * pxPerSvgX;
+        float capH_px = capHeight * pxPerSvgY;
+        float stemW_px = stemWidth * pxPerSvgX;
+        float stemH_px = stemHeight * pxPerSvgY;
+
+        float capLeft = (W - capW_px) * 0.5f;
+        float stemLeft = (W - stemW_px) * 0.5f;
+
+        // ---- Компоновка C: от нижнего края вверх ----
+        float stemBottom = 0f;
+        float stemTop = stemH_px;
+        float capTop = stemTop;
+
+        // ---- Шляпка: металлическая (светло-серый) ----
+        System.Func<float, Color> metalColor = (t) =>
+        {
+            Color dark = new Color(0.62f, 0.65f, 0.70f);
+            Color light = new Color(0.90f, 0.92f, 0.95f);
+            if (t < 0.5f) return Color.Lerp(dark, light, t * 2f);
+            return Color.Lerp(light, dark, (t - 0.5f) * 2f);
+        };
+
+        // ---- Ножка: пробка ----
+        Color baseCork = new Color(0.78f, 0.60f, 0.40f, 1f);
+
+        System.Func<float, float, Color> corkColor = (px, py) =>
+        {
+            float big1 = Mathf.Sin(px * 0.20f + py * 0.15f);
+            float big2 = Mathf.Cos(px * 0.13f - py * 0.22f + 1.7f);
+            float big = (big1 + big2) * 0.5f;
+
+            float small1 = Mathf.Sin(px * 1.9f + py * 2.3f);
+            float small2 = Mathf.Cos(px * 2.7f - py * 1.5f);
+            float small = (small1 + small2) * 0.5f;
+
+            float darkSpots = Mathf.Clamp01((big - 0.35f) / 0.65f) * 0.30f;
+            float lightSpots = Mathf.Clamp01((small - 0.30f) / 0.70f) * 0.15f;
+
+            float shade = 1f - darkSpots + lightSpots;
+
+            float r = Mathf.Clamp01(baseCork.r * shade);
+            float g = Mathf.Clamp01(baseCork.g * shade);
+            float b = Mathf.Clamp01(baseCork.b * shade);
+
+            return new Color(r, g, b, 1f);
+        };
+
+        // ---- Шляпка ----
+        float capRadius = capH_px * 0.25f;
+        float capBottomRadius = capH_px * 0.15f;
+
+        float capBottom = capTop;
+        float capCeil = capTop + capH_px;
 
         for (int y = 0; y < H; y++)
         {
             float py = y + 0.5f;
-            float svgY = H - py;
-
-            if (svgY < topTop || svgY > topBottom) continue;
+            if (py < capBottom || py > capCeil) continue;
 
             for (int x = 0; x < W; x++)
             {
                 float px = x + 0.5f;
-                if (px < topLeft || px > topRight) continue;
+                if (px < capLeft || px > capLeft + capW_px) continue;
 
                 bool inside = true;
-                float rl = topLeft + topRadius;
-                float rr = topRight - topRadius;
 
-                if (px < rl && svgY < topTop + topRadius)
-                    inside = Vector2.Distance(new Vector2(px, svgY), new Vector2(rl, topTop + topRadius)) <= topRadius;
-                else if (px > rr && svgY < topTop + topRadius)
-                    inside = Vector2.Distance(new Vector2(px, svgY), new Vector2(rr, topTop + topRadius)) <= topRadius;
+                float rl = capLeft + capRadius;
+                float rr = capLeft + capW_px - capRadius;
+                float rt = capCeil - capRadius;
 
-                if (!inside) continue;
+                if (px < rl && py > rt)
+                    inside = Vector2.Distance(new Vector2(px, py), new Vector2(rl, rt)) <= capRadius;
+                else if (px > rr && py > rt)
+                    inside = Vector2.Distance(new Vector2(px, py), new Vector2(rr, rt)) <= capRadius;
 
-                float t = (px - topLeft) / (topRight - topLeft);
-                tex.SetPixel(x, y, CapTopGradient(t));
-            }
-        }
-
-        for (int y = 0; y < H; y++)
-        {
-            float py = y + 0.5f;
-            float svgY = H - py;
-
-            if (svgY < baseTop || svgY > baseBottom) continue;
-
-            for (int x = 0; x < W; x++)
-            {
-                float px = x + 0.5f;
-                if (px < baseLeft || px > baseRight) continue;
-
-                bool inside = true;
-                float rl = baseLeft + baseRadius;
-                float rr = baseRight - baseRadius;
-                float rb = baseBottom - baseRadius;
-
-                if (px < rl && svgY > rb)
-                    inside = Vector2.Distance(new Vector2(px, svgY), new Vector2(rl, rb)) <= baseRadius;
-                else if (px > rr && svgY > rb)
-                    inside = Vector2.Distance(new Vector2(px, svgY), new Vector2(rr, rb)) <= baseRadius;
-
-                if (!inside) continue;
-
-                float t = (px - baseLeft) / (baseRight - baseLeft);
-                tex.SetPixel(x, y, CapGradient(t));
-            }
-        }
-
-        float capCx = 0.5f * W;
-        float capCy = 0.18f * H;
-        float capRx = 0.40f * W;
-        float capRy = 0.08f * H;
-
-        for (int y = 0; y < H; y++)
-        {
-            float svgY = H - (y + 0.5f);
-            for (int x = 0; x < W; x++)
-            {
-                float svgX = x + 0.5f;
-                float dx = (svgX - capCx) / capRx;
-                float dy = (svgY - capCy) / capRy;
-                float dist = dx * dx + dy * dy;
-                if (dist <= 1f)
+                if (inside)
                 {
-                    float alpha = (1f - dist) * 0.35f;
-                    Color c = new Color(1f, 1f, 1f, alpha);
-                    BlendPixel(tex, x, y, c);
+                    float rlb = capLeft + capBottomRadius;
+                    float rrb = capLeft + capW_px - capBottomRadius;
+                    float rb = capBottom + capBottomRadius;
+
+                    if (px < rlb && py < rb)
+                        inside = Vector2.Distance(new Vector2(px, py), new Vector2(rlb, rb)) <= capBottomRadius;
+                    else if (px > rrb && py < rb)
+                        inside = Vector2.Distance(new Vector2(px, py), new Vector2(rrb, rb)) <= capBottomRadius;
                 }
+
+                if (!inside) continue;
+
+                float t = (px - capLeft) / capW_px;
+                Color c = metalColor(t);
+                BlendPixel(tex, x, y, c);
+            }
+        }
+
+        // ---- Ножка ----
+        // Скругление нижних углов от реального низа (stemBottom = 0).
+        float rx = stemW_px * 0.18f;
+        float ry = stemW_px * 0.18f;
+
+        for (int y = 0; y < H; y++)
+        {
+            float py = y + 0.5f;
+            if (py < stemBottom || py > stemTop) continue;
+
+            for (int x = 0; x < W; x++)
+            {
+                float px = x + 0.5f;
+                if (px < stemLeft || px > stemLeft + stemW_px) continue;
+
+                bool inside = true;
+
+                if (py < stemBottom + ry)
+                {
+                    float dy = (stemBottom + ry) - py;
+                    float dx = 0f;
+
+                    if (px < stemLeft + rx)
+                        dx = (stemLeft + rx) - px;
+                    else if (px > stemLeft + stemW_px - rx)
+                        dx = px - (stemLeft + stemW_px - rx);
+
+                    if (dx > 0f)
+                    {
+                        float nx = dx / rx;
+                        float ny = dy / ry;
+                        inside = (nx * nx + ny * ny) <= 1f;
+                    }
+                }
+
+                if (!inside) continue;
+
+                Color c = corkColor(px, py);
+                BlendPixel(tex, x, y, c);
             }
         }
 
@@ -490,29 +528,13 @@ public class SVGConverter : MonoBehaviour
         SavePNG(tex, "cap.png");
     }
 
-    // ==================== СЛОЙ ====================
-
-    [ContextMenu("Generate Layer PNG")]
-    public void GenerateLayer()
-    {
-        int W = 300;
-        int H = 120;
-        Texture2D tex = new Texture2D(W, H, TextureFormat.RGBA32, false);
-
-        Color[] fill = new Color[W * H];
-        for (int i = 0; i < fill.Length; i++) fill[i] = Color.white;
-        tex.SetPixels(fill);
-        tex.Apply();
-
-        SavePNG(tex, "layer.png");
-    }
-
     [ContextMenu("Generate Layer Bottom PNG")]
     public void GenerateLayerBottom()
     {
         int W = 300;
         int H = 120;
-        float radius = 30f;
+        float rx = 100f;
+        float ry = 25f;
         Texture2D tex = new Texture2D(W, H, TextureFormat.RGBA32, false);
 
         Color[] clear = new Color[W * H];
@@ -528,20 +550,19 @@ public class SVGConverter : MonoBehaviour
 
                 bool inside = true;
 
-                if (py < radius)
+                if (py < ry)
                 {
                     float dx = 0f;
-                    float dy = radius - py;
+                    float dy = (ry - py) / ry;
 
-                    if (px < radius)
-                        dx = radius - px;
-                    else if (px > W - radius)
-                        dx = px - (W - radius);
+                    if (px < rx)
+                        dx = (rx - px) / rx;
+                    else if (px > W - rx)
+                        dx = (px - (W - rx)) / rx;
 
                     if (dx > 0f)
                     {
-                        float dist = Mathf.Sqrt(dx * dx + dy * dy);
-                        inside = (dist <= radius);
+                        inside = (dx * dx + dy * dy) <= 1f;
                     }
                 }
 

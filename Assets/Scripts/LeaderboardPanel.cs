@@ -1,13 +1,8 @@
+using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
-using System.Collections.Generic;
-using System.Collections;
 
-/// <summary>
-/// Панель рейтинга.
-/// Компонент сам создаёт Canvas на своём GameObject.
-/// Close() уничтожает сам контейнер, поэтому повторное открытие работает.
-/// </summary>
 public class LeaderboardPanel : MonoBehaviour
 {
     private Transform contentRoot;
@@ -131,20 +126,19 @@ public class LeaderboardPanel : MonoBehaviour
         statusText = MakeCenteredText(panel.transform, "", new Vector2(0, 590), 34, FontStyle.Italic,
             new Color(0.5f, 0.5f, 0.55f), new Vector2(800, 60));
 
-        // Три кнопки внизу: Мой профиль / Обновить / Закрыть
-        CreateButton(panel.transform, "Мой профиль", new Vector2(-280, -660),
+        UIHelper.CreateButton(panel.transform, "Мой профиль", new Vector2(-280, -660),
             new Vector2(280, 100), new Color(0.85f, 0.65f, 0.25f), () =>
             {
                 onProfileRequested?.Invoke();
             });
 
-        CreateButton(panel.transform, "Обновить", new Vector2(0, -660),
+        UIHelper.CreateButton(panel.transform, "Обновить", new Vector2(0, -660),
             new Vector2(280, 100), new Color(0.3f, 0.55f, 0.85f), () =>
             {
                 StartCoroutine(LoadScores());
             });
 
-        CreateButton(panel.transform, "Закрыть", new Vector2(280, -660),
+        UIHelper.CreateButton(panel.transform, "Закрыть", new Vector2(280, -660),
             new Vector2(280, 100), new Color(0.6f, 0.6f, 0.65f), Close);
     }
 
@@ -208,7 +202,6 @@ public class LeaderboardPanel : MonoBehaviour
         bool isMe = (rec.device_id == PlayerProfile.DeviceId);
         if (isMe)
         {
-            // Своя строка — светло-зелёная, чтобы сразу видеть себя в списке.
             rowImg.color = new Color(0.65f, 0.92f, 0.65f, 0.85f);
         }
         else
@@ -228,7 +221,6 @@ public class LeaderboardPanel : MonoBehaviour
         MakeRowText(row.transform, place.ToString(), new Vector2(20, 0), 38, FontStyle.Bold,
             new Color(0.2f, 0.2f, 0.3f), new Vector2(60, 90));
 
-        // Флаг (PNG-спрайт), fallback — текстовый код
         Sprite flag = CountryData.GetFlagSprite(rec.country_code);
         if (flag != null)
         {
@@ -327,44 +319,6 @@ public class LeaderboardPanel : MonoBehaviour
         rt.anchoredPosition = anchoredPos;
         rt.sizeDelta = sizeDelta;
         return t;
-    }
-
-    void CreateButton(Transform parent, string label, Vector2 pos, Vector2 size, Color color, System.Action onClick)
-    {
-        GameObject btnObj = new GameObject("Btn_" + label);
-        btnObj.transform.SetParent(parent, false);
-        Image img = btnObj.AddComponent<Image>();
-        img.color = color;
-        if (UIHelper.RoundedButtonSprite != null)
-        {
-            img.sprite = UIHelper.RoundedButtonSprite;
-            img.type = Image.Type.Sliced;
-        }
-        Button btn = btnObj.AddComponent<Button>();
-        btn.targetGraphic = img;
-        btn.onClick.AddListener(() => onClick?.Invoke());
-
-        RectTransform rt = btnObj.GetComponent<RectTransform>();
-        rt.anchorMin = new Vector2(0.5f, 0.5f);
-        rt.anchorMax = new Vector2(0.5f, 0.5f);
-        rt.pivot = new Vector2(0.5f, 0.5f);
-        rt.anchoredPosition = pos;
-        rt.sizeDelta = size;
-
-        GameObject textObj = new GameObject("Text");
-        textObj.transform.SetParent(btnObj.transform, false);
-        Text t = textObj.AddComponent<Text>();
-        t.text = label;
-        t.font = UIHelper.Font;
-        t.fontSize = 40;
-        t.alignment = TextAnchor.MiddleCenter;
-        t.color = Color.white;
-        t.raycastTarget = false;
-        RectTransform trt = t.rectTransform;
-        trt.anchorMin = Vector2.zero;
-        trt.anchorMax = Vector2.one;
-        trt.offsetMin = Vector2.zero;
-        trt.offsetMax = Vector2.zero;
     }
 
     void Close()

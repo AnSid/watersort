@@ -160,7 +160,7 @@ public class ProfilePanel : MonoBehaviour
         MakeText(panel.transform, "Пока нет наград", new Vector2(0, 80), 40, FontStyle.Normal,
             new Color(0.5f, 0.5f, 0.55f), new Vector2(700, 70), TextAnchor.MiddleCenter);
 
-        CreateButton(panel.transform, "Сохранить", new Vector2(-180, -500),
+        UIHelper.CreateButton(panel.transform, "Сохранить", new Vector2(-180, -500),
             new Vector2(320, 100), new Color(0.3f, 0.75f, 0.4f), () =>
             {
                 if (nameInput != null && !string.IsNullOrEmpty(nameInput.text))
@@ -170,7 +170,7 @@ public class ProfilePanel : MonoBehaviour
                 Close();
             });
 
-        CreateButton(panel.transform, "Закрыть", new Vector2(180, -500),
+        UIHelper.CreateButton(panel.transform, "Закрыть", new Vector2(180, -500),
             new Vector2(320, 100), new Color(0.6f, 0.6f, 0.65f), Close);
     }
 
@@ -210,44 +210,6 @@ public class ProfilePanel : MonoBehaviour
         yield return LeaderboardAPI.GetTopScores(50, result => { fresh = result; });
         if (fresh != null && fresh.Count > 0)
             LeaderboardCache.Save(fresh);
-    }
-
-    void CreateButton(Transform parent, string label, Vector2 pos, Vector2 size, Color color, Action onClick)
-    {
-        GameObject btnObj = new GameObject("Btn_" + label);
-        btnObj.transform.SetParent(parent, false);
-        Image img = btnObj.AddComponent<Image>();
-        img.color = color;
-        if (UIHelper.RoundedButtonSprite != null)
-        {
-            img.sprite = UIHelper.RoundedButtonSprite;
-            img.type = Image.Type.Sliced;
-        }
-        Button btn = btnObj.AddComponent<Button>();
-        btn.targetGraphic = img;
-        btn.onClick.AddListener(() => onClick?.Invoke());
-
-        RectTransform rt = btnObj.GetComponent<RectTransform>();
-        rt.anchorMin = new Vector2(0.5f, 0.5f);
-        rt.anchorMax = new Vector2(0.5f, 0.5f);
-        rt.pivot = new Vector2(0.5f, 0.5f);
-        rt.anchoredPosition = pos;
-        rt.sizeDelta = size;
-
-        GameObject textObj = new GameObject("Text");
-        textObj.transform.SetParent(btnObj.transform, false);
-        Text t = textObj.AddComponent<Text>();
-        t.text = label;
-        t.font = UIHelper.Font;
-        t.fontSize = 44;
-        t.alignment = TextAnchor.MiddleCenter;
-        t.color = Color.white;
-        t.raycastTarget = false;
-        RectTransform trt = t.rectTransform;
-        trt.anchorMin = Vector2.zero;
-        trt.anchorMax = Vector2.one;
-        trt.offsetMin = Vector2.zero;
-        trt.offsetMax = Vector2.zero;
     }
 
     Text MakeText(Transform parent, string content, Vector2 pos, int size, FontStyle style, Color color, Vector2 sizeDelta, TextAnchor align, Vector2? pivot = null)

@@ -1,6 +1,6 @@
+using System;
 using UnityEngine;
 using UnityEngine.UI;
-using System;
 
 public class Toolbar : MonoBehaviour
 {
@@ -10,17 +10,14 @@ public class Toolbar : MonoBehaviour
     public Action OnUndoClicked;
     public Action OnRefreshClicked;
 
-    private Text levelText;
     private Text topText;
     private Text hintText;
     private Font uiFont;
 
     private Button undoButton;
     private Button addTubeButton;
-    private Button flagButton;
     private Image undoImage;
     private Image addTubeImage;
-    private Image flagImage;
 
     private const float BAR_HEIGHT = 120f;
     private const float BTN_SIZE = 90f;
@@ -29,18 +26,20 @@ public class Toolbar : MonoBehaviour
     private const float NUM_GAP = 10f;
     private const float EDGE_PAD = 20f;
 
-    private static readonly Color BtnActive = Color.white;
-    private static readonly Color BtnDisabled = new Color(1f, 1f, 1f, 0.35f);
-    private static readonly Color FlagIdle = new Color(1f, 1f, 1f, 0.75f);
+    // Цвета иконок и цифр на белом тулбаре.
+    private static readonly Color IconActive = new Color(0.25f, 0.30f, 0.40f, 1f);
+    private static readonly Color IconDisabled = new Color(0.25f, 0.30f, 0.40f, 0.30f);
+    private static readonly Color TopTextColor = new Color(0.25f, 0.30f, 0.40f, 1f);
 
     public void Build(Transform canvasTransform)
     {
         uiFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
 
+        // ---- Тулбар: белая полоса ----
         GameObject topBar = new GameObject("TopBar");
         topBar.transform.SetParent(canvasTransform, false);
         Image topImg = topBar.AddComponent<Image>();
-        topImg.color = new Color(0.3f, 0.55f, 0.85f);
+        topImg.color = new Color(1f, 1f, 1f, 0.95f);
         topImg.raycastTarget = false;
 
         RectTransform topRt = topBar.GetComponent<RectTransform>();
@@ -50,8 +49,21 @@ public class Toolbar : MonoBehaviour
         topRt.anchoredPosition = Vector2.zero;
         topRt.sizeDelta = new Vector2(0f, BAR_HEIGHT);
 
+        // ---- Тень под тулбаром: тонкая полоска ----
+        GameObject shadow = new GameObject("TopBarShadow");
+        shadow.transform.SetParent(topBar.transform, false);
+        Image shadowImg = shadow.AddComponent<Image>();
+        shadowImg.color = new Color(0f, 0f, 0f, 0.06f);
+        shadowImg.raycastTarget = false;
+        RectTransform shRt = shadow.GetComponent<RectTransform>();
+        shRt.anchorMin = new Vector2(0f, 0f);
+        shRt.anchorMax = new Vector2(1f, 0f);
+        shRt.pivot = new Vector2(0.5f, 1f);
+        shRt.anchoredPosition = Vector2.zero;
+        shRt.sizeDelta = new Vector2(0f, 6f);
+
         // ============================================================
-        // ЛЕВАЯ ГРУППА: [leaderboard] [N] gap [flag] [M]
+        // ЛЕВАЯ ГРУППА: [leaderboard] [N позиция]
         // ============================================================
         float x = EDGE_PAD;
 
@@ -62,16 +74,6 @@ public class Toolbar : MonoBehaviour
 
         topText = CreateNumberBlock(topBar.transform, x, "—",
             () => OnLeaderboardClicked?.Invoke());
-        x += NUM_W + NUM_GAP;
-
-        flagButton = CreateButtonAt(topBar.transform, "flag",
-            new Vector2(x + BTN_SIZE / 2f, 0f),
-            () => { });
-        flagButton.interactable = false;
-        if (flagImage != null) flagImage.color = FlagIdle;
-        x += BTN_SIZE + BTN_GAP;
-
-        levelText = CreateNumberBlock(topBar.transform, x, "1", null);
 
         // ============================================================
         // ПРАВАЯ ГРУППА: [addtube] [undo] [refresh] [settings]
@@ -88,9 +90,10 @@ public class Toolbar : MonoBehaviour
         addTubeButton = CreateButtonAtRight(topBar.transform, "addtube", rightBase - step * 3f,
             () => OnAddTubeClicked?.Invoke());
 
+        // Хинт — ниже, потому что над ним «Уровень N».
         hintText = MakeText(canvasTransform, "Hint", "Выбери колбочку",
-            TextAnchor.UpperCenter, new Vector2(0, -160), 45,
-            new Color(0.3f, 0.3f, 0.35f), new Vector2(900, 200));
+            TextAnchor.UpperCenter, new Vector2(0, -300), 36,
+            new Color(0.45f, 0.45f, 0.5f), new Vector2(900, 120));
     }
 
     Button CreateButtonAt(Transform parent, string iconName, Vector2 centerPos, Action onClick)
@@ -151,12 +154,12 @@ public class Toolbar : MonoBehaviour
         if (sp != null)
         {
             icon.sprite = sp;
-            icon.color = Color.white;
+            icon.color = IconActive;
             icon.preserveAspect = true;
         }
         else
         {
-            icon.color = new Color(1f, 1f, 1f, 0.5f);
+            icon.color = new Color(0.5f, 0.5f, 0.5f, 0.5f);
             Debug.LogWarning($"[Toolbar] Не найден спрайт Icons/icon_{iconName}");
         }
         icon.raycastTarget = false;
@@ -169,7 +172,6 @@ public class Toolbar : MonoBehaviour
 
         if (iconName == "undo") undoImage = icon;
         if (iconName == "addtube") addTubeImage = icon;
-        if (iconName == "flag") flagImage = icon;
     }
 
     Text CreateNumberBlock(Transform parent, float leftX, string initial, Action onClick)
@@ -202,7 +204,7 @@ public class Toolbar : MonoBehaviour
         t.fontSize = 46;
         t.fontStyle = FontStyle.Bold;
         t.alignment = TextAnchor.MiddleCenter;
-        t.color = Color.white;
+        t.color = TopTextColor;
         t.raycastTarget = false;
 
         RectTransform ttRt = t.rectTransform;
@@ -243,35 +245,25 @@ public class Toolbar : MonoBehaviour
         return t;
     }
 
-    // Цвет цифры уровня по диапазону сложности.
-    // Логика совпадает с LevelGenerator.GetLevelParams:
-    //   чем выше уровень — тем «горячее» цвет.
-    // 26+ — ярко-розовый: на синем фоне топбара тёмно-фиолетовый сливался.
-    Color GetLevelColor(int level)
+    // Цвет цифры уровня — плавный градиент в одной гамме.
+    public static Color GetLevelColor(int level)
     {
-        if (level <= 4) return new Color(0.35f, 0.85f, 0.40f); // зелёный
-        if (level <= 6) return new Color(0.65f, 0.85f, 0.35f); // жёлто-зелёный
-        if (level <= 9) return new Color(0.95f, 0.85f, 0.30f); // жёлтый
-        if (level <= 12) return new Color(0.95f, 0.65f, 0.25f); // оранжевый
-        if (level <= 15) return new Color(0.95f, 0.45f, 0.25f); // оранжево-красный
-        if (level <= 18) return new Color(0.95f, 0.30f, 0.30f); // красный
-        if (level <= 20) return new Color(0.90f, 0.30f, 0.55f); // красно-розовый
-        if (level <= 25) return new Color(0.75f, 0.40f, 0.85f); // фиолетовый
-        return new Color(0.95f, 0.45f, 0.75f);                  // ярко-розовый (26+)
+        float t = Mathf.Clamp01((level - 1) / 29f);
+        Color from = new Color(0.45f, 0.70f, 0.55f);
+        Color to = new Color(0.40f, 0.55f, 0.75f);
+        return Color.Lerp(from, to, t);
     }
 
-    // Цвет цифры позиции в рейтинге.
-    // Топ-3 — праздничные цвета, дальше градация по «уровню успеха».
-    // 11–50 — светло-жёлтый (а не голубой): на синем фоне голубой сливается.
+    // Цвет цифры позиции в рейтинге. На белом фоне — тёмные цвета.
     Color GetTopColor(int top)
     {
-        if (top <= 0) return Color.white;
-        if (top == 1) return new Color(1.00f, 0.85f, 0.30f); // золотой
-        if (top == 2) return new Color(0.85f, 0.85f, 0.90f); // серебряный
-        if (top == 3) return new Color(0.85f, 0.55f, 0.30f); // бронзовый
-        if (top <= 10) return new Color(0.40f, 0.85f, 0.45f); // зелёный
-        if (top <= 50) return new Color(1.00f, 0.90f, 0.50f); // светло-жёлтый
-        return Color.white;                                    // >50 — белый
+        if (top <= 0) return TopTextColor;
+        if (top == 1) return new Color(0.85f, 0.65f, 0.20f); // золотой
+        if (top == 2) return new Color(0.60f, 0.60f, 0.65f); // серебряный
+        if (top == 3) return new Color(0.70f, 0.45f, 0.25f); // бронзовый
+        if (top <= 10) return new Color(0.30f, 0.65f, 0.35f); // зелёный
+        if (top <= 50) return new Color(0.75f, 0.65f, 0.30f); // тёмно-жёлтый
+        return TopTextColor;
     }
 
     private int _level = 1;
@@ -280,23 +272,16 @@ public class Toolbar : MonoBehaviour
     public void SetLevel(int level)
     {
         _level = level;
-        UpdateLevelText();
     }
 
     public void SetTop(int topPosition)
     {
         _top = topPosition;
-        UpdateLevelText();
+        UpdateTopText();
     }
 
-    void UpdateLevelText()
+    void UpdateTopText()
     {
-        if (levelText != null)
-        {
-            levelText.text = _level.ToString();
-            levelText.color = GetLevelColor(_level);
-        }
-
         if (topText != null)
         {
             topText.text = _top > 0 ? _top.ToString() : "—";
@@ -312,13 +297,13 @@ public class Toolbar : MonoBehaviour
     public void SetUndoEnabled(bool enabled)
     {
         if (undoButton != null) undoButton.interactable = enabled;
-        if (undoImage != null) undoImage.color = enabled ? BtnActive : BtnDisabled;
+        if (undoImage != null) undoImage.color = enabled ? IconActive : IconDisabled;
     }
 
     public void SetAddTubeEnabled(bool enabled)
     {
         if (addTubeButton != null) addTubeButton.interactable = enabled;
-        if (addTubeImage != null) addTubeImage.color = enabled ? BtnActive : BtnDisabled;
+        if (addTubeImage != null) addTubeImage.color = enabled ? IconActive : IconDisabled;
     }
 
     public void SetLoading(bool isLoading)

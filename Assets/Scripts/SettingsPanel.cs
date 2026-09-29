@@ -1,12 +1,7 @@
+using System;
 using UnityEngine;
 using UnityEngine.UI;
-using System;
 
-/// <summary>
-/// Панель настроек: анимация, звуки, музыка, профиль, сброс прогресса.
-/// Компонент сам создаёт Canvas на своём GameObject.
-/// Close() уничтожает сам контейнер, поэтому повторное открытие работает.
-/// </summary>
 public class SettingsPanel : MonoBehaviour
 {
     private Action onProfileRequested;
@@ -30,7 +25,6 @@ public class SettingsPanel : MonoBehaviour
         scaler.matchWidthOrHeight = 0.5f;
         gameObject.AddComponent<GraphicRaycaster>();
 
-        // Затемнение
         GameObject bg = new GameObject("BG");
         bg.transform.SetParent(transform, false);
         Image bgImg = bg.AddComponent<Image>();
@@ -41,7 +35,6 @@ public class SettingsPanel : MonoBehaviour
         bgRt.offsetMin = Vector2.zero;
         bgRt.offsetMax = Vector2.zero;
 
-        // Белая панель
         GameObject panel = new GameObject("Panel");
         panel.transform.SetParent(transform, false);
         Image panelImg = panel.AddComponent<Image>();
@@ -56,44 +49,47 @@ public class SettingsPanel : MonoBehaviour
         pRt.anchorMax = new Vector2(0.5f, 0.5f);
         pRt.pivot = new Vector2(0.5f, 0.5f);
         pRt.anchoredPosition = Vector2.zero;
-        pRt.sizeDelta = new Vector2(860f, 1100f);
+        pRt.sizeDelta = new Vector2(860f, 1200f);
 
-        // Заголовок
         MakeText(panel.transform, "Настройки",
-            new Vector2(0, 470), 70, FontStyle.Bold, new Color(0.15f, 0.15f, 0.2f),
+            new Vector2(0, 520), 70, FontStyle.Bold, new Color(0.15f, 0.15f, 0.2f),
             new Vector2(800, 100), TextAnchor.MiddleCenter);
 
-        // Переключатели
-        float y = 320f;
+        float y = 360f;
         CreateToggleRow(panel.transform, "Анимация перелива", GameSettings.AnimationEnabled, y,
             v => GameSettings.AnimationEnabled = v);
-        y -= 140f;
+        y -= 130f;
         CreateToggleRow(panel.transform, "Звуки", GameSettings.SoundEnabled, y,
             v => GameSettings.SoundEnabled = v);
-        y -= 140f;
+        y -= 130f;
         CreateToggleRow(panel.transform, "Музыка", GameSettings.MusicEnabled, y,
             v => GameSettings.MusicEnabled = v);
+        y -= 130f;
+        CreateToggleRow(panel.transform, "Реклама", GameSettings.AdsEnabled, y,
+            v =>
+            {
+                GameSettings.AdsEnabled = v;
+                if (AdManager.Instance != null)
+                    AdManager.Instance.OnAdsEnabledChanged();
+            });
 
-        // Кнопка Профиль
         y -= 180f;
-        CreateButton(panel.transform, "Профиль", new Vector2(0, y),
+        UIHelper.CreateButton(panel.transform, "Профиль", new Vector2(0, y),
             new Vector2(500, 100), new Color(0.3f, 0.55f, 0.85f), () =>
             {
                 onProfileRequested?.Invoke();
                 Close();
             });
 
-        // Кнопка Сбросить прогресс
         y -= 130f;
-        CreateButton(panel.transform, "Сбросить прогресс", new Vector2(0, y),
+        UIHelper.CreateButton(panel.transform, "Сбросить прогресс", new Vector2(0, y),
             new Vector2(500, 100), new Color(0.85f, 0.35f, 0.3f), () =>
             {
                 onProgressReset?.Invoke();
                 Close();
             });
 
-        // Кнопка Закрыть
-        CreateButton(panel.transform, "Закрыть", new Vector2(0, -470f),
+        UIHelper.CreateButton(panel.transform, "Закрыть", new Vector2(0, -520f),
             new Vector2(400, 100), new Color(0.6f, 0.6f, 0.65f), Close);
     }
 
@@ -158,44 +154,6 @@ public class SettingsPanel : MonoBehaviour
             bt.text = state ? "ВКЛ" : "ВЫКЛ";
             onChange?.Invoke(state);
         });
-    }
-
-    void CreateButton(Transform parent, string label, Vector2 pos, Vector2 size, Color color, Action onClick)
-    {
-        GameObject btnObj = new GameObject("Btn_" + label);
-        btnObj.transform.SetParent(parent, false);
-        Image img = btnObj.AddComponent<Image>();
-        img.color = color;
-        if (UIHelper.RoundedButtonSprite != null)
-        {
-            img.sprite = UIHelper.RoundedButtonSprite;
-            img.type = Image.Type.Sliced;
-        }
-        Button btn = btnObj.AddComponent<Button>();
-        btn.targetGraphic = img;
-        btn.onClick.AddListener(() => onClick?.Invoke());
-
-        RectTransform rt = btnObj.GetComponent<RectTransform>();
-        rt.anchorMin = new Vector2(0.5f, 0.5f);
-        rt.anchorMax = new Vector2(0.5f, 0.5f);
-        rt.pivot = new Vector2(0.5f, 0.5f);
-        rt.anchoredPosition = pos;
-        rt.sizeDelta = size;
-
-        GameObject textObj = new GameObject("Text");
-        textObj.transform.SetParent(btnObj.transform, false);
-        Text t = textObj.AddComponent<Text>();
-        t.text = label;
-        t.font = UIHelper.Font;
-        t.fontSize = 44;
-        t.alignment = TextAnchor.MiddleCenter;
-        t.color = Color.white;
-        t.raycastTarget = false;
-        RectTransform trt = t.rectTransform;
-        trt.anchorMin = Vector2.zero;
-        trt.anchorMax = Vector2.one;
-        trt.offsetMin = Vector2.zero;
-        trt.offsetMax = Vector2.zero;
     }
 
     Text MakeText(Transform parent, string content, Vector2 pos, int size, FontStyle style, Color color, Vector2 sizeDelta, TextAnchor align)

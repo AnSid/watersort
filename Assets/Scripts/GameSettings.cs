@@ -8,6 +8,7 @@ public static class GameSettings
     private const string KEY_ANIM = "Setting_Anim";
     private const string KEY_SOUND = "Setting_Sound";
     private const string KEY_MUSIC = "Setting_Music";
+    private const string KEY_ADS = "Setting_Ads";
 
     public static bool AnimationEnabled
     {
@@ -25,5 +26,15 @@ public static class GameSettings
     {
         get => PlayerPrefs.GetInt(KEY_MUSIC, 1) == 1;
         set { PlayerPrefs.SetInt(KEY_MUSIC, value ? 1 : 0); PlayerPrefs.Save(); }
+    }
+
+    /// <summary>
+    /// Реклама включена. По умолчанию true.
+    /// При переключении вызывать AdManager.Instance.OnAdsEnabledChanged().
+    /// </summary>
+    public static bool AdsEnabled
+    {
+        get => PlayerPrefs.GetInt(KEY_ADS, 1) == 1;
+        set { PlayerPrefs.SetInt(KEY_ADS, value ? 1 : 0); PlayerPrefs.Save(); }
     }
 }

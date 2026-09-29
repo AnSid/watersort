@@ -1,7 +1,7 @@
-using UnityEngine;
-using UnityEngine.UI;
 using System.Collections;
 using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.UI;
 
 public class WaterSort : MonoBehaviour
 {
@@ -35,15 +35,22 @@ public class WaterSort : MonoBehaviour
 
     private bool[] wasSolved;
 
+    // ---- Триггеры рекламы ----
+    private int moveCounter = 0;
+    private bool interstitialShownForAddTube = false;
+
     private struct MoveRecord { public int from; public int to; public int count; }
     private Stack<MoveRecord> moveHistory = new Stack<MoveRecord>();
 
     private Text winText;
     private Image winPanel;
     private GameObject nextButtonObj;
+    private RectTransform _nextButtonHolderRt;
     private Camera cam;
     private Toolbar toolbar;
     private Transform uiCanvas;
+
+    private Text levelText;
 
     private AudioSource audioSource;
     private AudioSource musicSource;
@@ -58,6 +65,7 @@ public class WaterSort : MonoBehaviour
     public Sprite capSprite;
     public Sprite layerSprite;
     public Sprite layerBottomSprite;
+    public Sprite layerTopSprite;
     public Sprite roundedButtonSprite;
 
     private Rect _lastSafeArea;
@@ -68,18 +76,48 @@ public class WaterSort : MonoBehaviour
 
         PlayerProfile.TryAutoSetup();
 
+        SetupAds();
         SetupLighting();
         SetupCamera();
+        UIHelper.CreateGradientBackground(cam);
         SetupAudio();
         SetupToolbar();
         SetupWinUI();
 
-        // Если есть несинхронизированные баллы — попробуем отправить при старте.
+        // Подписка на видимость баннера — для сдвига кнопки «Следующий →».
+        if (AdManager.Instance != null)
+        {
+            AdManager.Instance.OnBannerVisibilityChanged += ApplyBannerLayout;
+            ApplyBannerLayout(AdManager.Instance.IsBannerVisible);
+        }
+
         if (ScoreManager.IsDirty)
             StartCoroutine(SyncScoreIfDirty());
 
         int saved = PlayerPrefs.GetInt("WaterSort_Level", 1);
         LoadLevel(saved);
+    }
+
+    void OnDestroy()
+    {
+        if (AdManager.Instance != null)
+            AdManager.Instance.OnBannerVisibilityChanged -= ApplyBannerLayout;
+    }
+
+    void SetupAds()
+    {
+        if (AdManager.Instance == null)
+        {
+            GameObject adObj = new GameObject("AdManager");
+            adObj.AddComponent<AdManager>();
+        }
+    }
+
+    void ApplyBannerLayout(bool bannerVisible)
+    {
+        if (_nextButtonHolderRt == null) return;
+        float y = bannerVisible ? 380f : 220f;
+        _nextButtonHolderRt.anchoredPosition = new Vector2(0f, y);
     }
 
     void SetupAudio()
@@ -197,6 +235,8 @@ public class WaterSort : MonoBehaviour
         float sizeByHeight = heightNeeded / 2f;
 
         cam.orthographicSize = Mathf.Max(sizeByWidth, sizeByHeight);
+
+        UIHelper.FitGradientToCamera(cam);
     }
 
     void SetupToolbar()
@@ -226,6 +266,23 @@ public class WaterSort : MonoBehaviour
 
     void SetupWinUI()
     {
+        GameObject levelObj = new GameObject("LevelLabel");
+        levelObj.transform.SetParent(uiCanvas, false);
+        levelText = levelObj.AddComponent<Text>();
+        levelText.text = "Уровень 1";
+        levelText.font = UIHelper.Font;
+        levelText.fontSize = 100;
+        levelText.fontStyle = FontStyle.Bold;
+        levelText.alignment = TextAnchor.MiddleCenter;
+        levelText.color = Toolbar.GetLevelColor(1);
+        levelText.raycastTarget = false;
+        RectTransform lvlRt = levelText.rectTransform;
+        lvlRt.anchorMin = new Vector2(0.5f, 1f);
+        lvlRt.anchorMax = new Vector2(0.5f, 1f);
+        lvlRt.pivot = new Vector2(0.5f, 1f);
+        lvlRt.anchoredPosition = new Vector2(0, -180);
+        lvlRt.sizeDelta = new Vector2(900, 140);
+
         GameObject winPanelObj = new GameObject("WinPanel");
         winPanelObj.transform.SetParent(uiCanvas, false);
         winPanel = winPanelObj.AddComponent<Image>();
@@ -261,41 +318,26 @@ public class WaterSort : MonoBehaviour
         wtRt.sizeDelta = new Vector2(900, 200);
         winTextObj.SetActive(false);
 
-        nextButtonObj = new GameObject("NextButton");
-        nextButtonObj.transform.SetParent(uiCanvas, false);
-        Image nextImg = nextButtonObj.AddComponent<Image>();
-        nextImg.color = new Color(0.3f, 0.75f, 0.4f);
-        if (roundedButtonSprite != null)
-        {
-            nextImg.sprite = roundedButtonSprite;
-            nextImg.type = Image.Type.Sliced;
-        }
-        Button nextButton = nextButtonObj.AddComponent<Button>();
-        nextButton.onClick.AddListener(NextLevel);
+        GameObject nextBtnHolder = new GameObject("NextButtonHolder");
+        nextBtnHolder.transform.SetParent(uiCanvas, false);
+        _nextButtonHolderRt = nextBtnHolder.AddComponent<RectTransform>();
+        _nextButtonHolderRt.anchorMin = new Vector2(0.5f, 0f);
+        _nextButtonHolderRt.anchorMax = new Vector2(0.5f, 0f);
+        _nextButtonHolderRt.pivot = new Vector2(0.5f, 0f);
+        _nextButtonHolderRt.anchoredPosition = new Vector2(0, 220);
+        _nextButtonHolderRt.sizeDelta = new Vector2(500, 120);
 
-        RectTransform nextRt = nextButtonObj.GetComponent<RectTransform>();
-        nextRt.anchorMin = new Vector2(0.5f, 0f);
-        nextRt.anchorMax = new Vector2(0.5f, 0f);
-        nextRt.pivot = new Vector2(0.5f, 0f);
-        nextRt.anchoredPosition = new Vector2(0, 220);
-        nextRt.sizeDelta = new Vector2(500, 120);
+        Button nextButton = UIHelper.CreateButton(
+            nextBtnHolder.transform,
+            "Следующий →",
+            Vector2.zero,
+            new Vector2(500, 120),
+            new Color(0.3f, 0.75f, 0.4f),
+            NextLevel,
+            50);
 
-        GameObject nextTextObj = new GameObject("NextText");
-        nextTextObj.transform.SetParent(nextButtonObj.transform, false);
-        Text nt = nextTextObj.AddComponent<Text>();
-        nt.text = "Следующий →";
-        nt.font = UIHelper.Font;
-        nt.fontSize = 50;
-        nt.alignment = TextAnchor.MiddleCenter;
-        nt.color = Color.white;
-        nt.raycastTarget = false;
-        RectTransform ntRt = nt.rectTransform;
-        ntRt.anchorMin = Vector2.zero;
-        ntRt.anchorMax = Vector2.one;
-        ntRt.offsetMin = Vector2.zero;
-        ntRt.offsetMax = Vector2.zero;
-
-        nextButtonObj.SetActive(false);
+        nextButtonObj = nextBtnHolder;
+        nextBtnHolder.SetActive(false);
     }
 
     void OpenSettings()
@@ -332,7 +374,6 @@ public class WaterSort : MonoBehaviour
         PlayerPrefs.SetInt("WaterSort_Level", 1);
         PlayerPrefs.Save();
         LoadLevel(1);
-        // ScoreManager не трогаем — счёт и MaxLevelReached сохраняются.
     }
 
     void LoadLevel(int level)
@@ -357,8 +398,16 @@ public class WaterSort : MonoBehaviour
             toolbar.SetAddTubeEnabled(false);
         }
 
+        if (levelText != null)
+        {
+            levelText.text = "Уровень " + currentLevel;
+            levelText.color = Toolbar.GetLevelColor(currentLevel);
+        }
+
         undoUsedCount = 0;
         tubeAdded = false;
+        moveCounter = 0;
+        interstitialShownForAddTube = false;
 
         StartNewGameInternal();
         RefreshTopFromCache();
@@ -367,6 +416,14 @@ public class WaterSort : MonoBehaviour
     void NextLevel()
     {
         PlaySound(clickSound);
+
+        // Межстраничная на чётных уровнях > 20
+        if (currentLevel > 20 && currentLevel % 2 == 0)
+        {
+            if (AdManager.Instance != null)
+                AdManager.Instance.TryShowInterstitial();
+        }
+
         LoadLevel(currentLevel + 1);
     }
 
@@ -457,7 +514,7 @@ public class WaterSort : MonoBehaviour
             spawnedObjects.Add(tubeObj);
 
             TubeVisual tv = tubeObj.AddComponent<TubeVisual>();
-            tv.Setup(i, tubePositions[i], colors, tubeSprite, capSprite, layerSprite, layerBottomSprite);
+            tv.Setup(i, tubePositions[i], colors, tubeSprite, capSprite, layerSprite, layerBottomSprite, layerTopSprite);
             tv.SetLayers(tubes[i]);
             tubeVisuals.Add(tv);
         }
@@ -642,6 +699,7 @@ public class WaterSort : MonoBehaviour
         }
 
         moveHistory.Push(new MoveRecord { from = from, to = to, count = pourCount });
+        moveCounter++;
 
         selectedTube = -1;
         toolbar.SetHint("Выбери колбочку");
@@ -729,6 +787,13 @@ public class WaterSort : MonoBehaviour
             return;
         }
 
+        // Межстраничная перед добавлением, 1 раз за уровень
+        if (!interstitialShownForAddTube && AdManager.Instance != null)
+        {
+            interstitialShownForAddTube = true;
+            AdManager.Instance.TryShowInterstitial();
+        }
+
         tubeAdded = true;
         TUBE_COUNT++;
         tubes.Add(new List<int>());
@@ -749,7 +814,7 @@ public class WaterSort : MonoBehaviour
             spawnedObjects.Add(tubeObj);
 
             TubeVisual tv = tubeObj.AddComponent<TubeVisual>();
-            tv.Setup(i, tubePositions[i], colors, tubeSprite, capSprite, layerSprite, layerBottomSprite);
+            tv.Setup(i, tubePositions[i], colors, tubeSprite, capSprite, layerSprite, layerBottomSprite, layerTopSprite);
             tv.SetLayers(tubes[i]);
             tubeVisuals.Add(tv);
         }
@@ -772,6 +837,10 @@ public class WaterSort : MonoBehaviour
             return;
         }
 
+        // Межстраничная при >5 ходах
+        if (moveCounter > 5 && AdManager.Instance != null)
+            AdManager.Instance.TryShowInterstitial();
+
         PlaySound(clickSound);
 
         ConfettiEffect.ClearAll();
@@ -789,6 +858,8 @@ public class WaterSort : MonoBehaviour
         moveHistory.Clear();
         undoUsedCount = 0;
         tubeAdded = false;
+        moveCounter = 0;
+        interstitialShownForAddTube = false;
         wasSolved = new bool[TUBE_COUNT];
 
         if (winText != null) winText.gameObject.SetActive(false);
@@ -809,7 +880,7 @@ public class WaterSort : MonoBehaviour
             spawnedObjects.Add(tubeObj);
 
             TubeVisual tv = tubeObj.AddComponent<TubeVisual>();
-            tv.Setup(i, tubePositions[i], colors, tubeSprite, capSprite, layerSprite, layerBottomSprite);
+            tv.Setup(i, tubePositions[i], colors, tubeSprite, capSprite, layerSprite, layerBottomSprite, layerTopSprite);
             tv.SetLayers(tubes[i]);
             tubeVisuals.Add(tv);
         }
@@ -844,6 +915,8 @@ public class WaterSort : MonoBehaviour
             if (nowSolved && !wasSolved[i])
             {
                 PlaySound(capCloseSound, 0.7f);
+                if (tubeVisuals[i] != null)
+                    tubeVisuals[i].PlayCapCloseAnimation();
             }
             wasSolved[i] = nowSolved;
         }
@@ -869,7 +942,6 @@ public class WaterSort : MonoBehaviour
 
     IEnumerator SubmitScoreAfterWin()
     {
-        // Начисляем баллы, если уровень новый. Повторное прохождение — 0.
         ScoreManager.AddPointsForLevel(currentLevel);
 
         string deviceId = PlayerProfile.DeviceId;
